@@ -86,14 +86,14 @@ Project uses Django structure with `catalog/` app:
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T024 [P] [US1] Unit test for Album model __str__ method in tests/unit/test_album_model.py
-- [ ] T025 [P] [US1] Unit test for Album.get_cover_art_or_placeholder() method in tests/unit/test_album_model.py
-- [ ] T026 [P] [US1] Unit test for Album.formatted_release_date() method in tests/unit/test_album_model.py
-- [ ] T027 [P] [US1] Integration test for album_list view rendering in tests/integration/test_album_views.py
-- [ ] T028 [P] [US1] Integration test for album tile display with all fields in tests/integration/test_album_views.py
-- [ ] T029 [P] [US1] Integration test for responsive grid layout CSS in tests/integration/test_templates.py
-- [ ] T030 [P] [US1] Contract test for Google Sheets CSV parsing in tests/contract/test_google_sheets.py
-- [ ] T031 [P] [US1] Contract test for Spotify API album fetch in tests/contract/test_spotify_api.py
+- [X] T024 [P] [US1] Unit test for Album model __str__ method in tests/unit/test_album_model.py
+- [X] T025 [P] [US1] Unit test for Album.get_cover_art_or_placeholder() method in tests/unit/test_album_model.py
+- [X] T026 [P] [US1] Unit test for Album.formatted_release_date() method in tests/unit/test_album_model.py
+- [X] T027 [P] [US1] Integration test for album_list view rendering in tests/integration/test_album_views.py
+- [X] T028 [P] [US1] Integration test for album tile display with all fields in tests/integration/test_album_views.py
+- [X] T029 [P] [US1] Integration test for responsive grid layout CSS in tests/integration/test_templates.py
+- [X] T030 [P] [US1] Contract test for Google Sheets CSV parsing in tests/contract/test_google_sheets.py
+- [X] T031 [P] [US1] Contract test for Spotify API album fetch in tests/contract/test_spotify_api.py
 
 ### Implementation for User Story 1
 
