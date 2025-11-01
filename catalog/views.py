@@ -15,11 +15,32 @@ class AlbumListView(ListView):
     Albums are ordered by release date (newest first), with a secondary
     sort by import date. Optimizes queries using select_related for
     artist, genre, and vocal_style foreign keys.
+
+    Supports HTMX partial updates: When HX-Request header is present,
+    returns only the album tiles fragment without page chrome.
     """
 
     model = Album
     template_name = "catalog/album_list.html"
     context_object_name = "albums"
+
+    def get_template_names(self) -> list[str]:
+        """
+        Return template name based on request type.
+
+        For HTMX requests (HX-Request header present), return the fragment
+        template containing only album tiles. For regular requests, return
+        the full page template.
+
+        Returns:
+            list[str]: List containing the appropriate template name
+        """
+        if self.request.headers.get("HX-Request"):
+            return ["catalog/album_list_tiles.html"]
+        template_name = self.template_name
+        if template_name is None:
+            return ["catalog/album_list.html"]
+        return [template_name]
 
     def get_queryset(self) -> QuerySet[Album]:
         """

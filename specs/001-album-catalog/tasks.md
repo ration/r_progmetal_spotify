@@ -47,30 +47,30 @@ Project uses Django structure with `catalog/` app:
 
 ### Database Models & Migrations
 
-- [ ] T006 [P] Create Artist model in catalog/models.py with fields: name, country, spotify_artist_id
-- [ ] T007 [P] Create Genre model in catalog/models.py with fields: name, slug
-- [ ] T008 [P] Create VocalStyle model in catalog/models.py with fields: name, slug
-- [ ] T009 Create Album model in catalog/models.py with fields: spotify_album_id, name, artist (FK), genre (FK), vocal_style (FK), release_date, cover_art_url, spotify_url, imported_at, updated_at
-- [ ] T010 Add model validation methods to Album model (clean() for spotify URL and ID validation)
-- [ ] T011 Create initial migration for catalog models (makemigrations catalog)
-- [ ] T012 Create data migration to seed Genre table with 8 progressive metal subgenres
-- [ ] T013 Create data migration to seed VocalStyle table with 4 vocal style options
-- [ ] T014 Run migrations (migrate catalog)
+- [X] T006 [P] Create Artist model in catalog/models.py with fields: name, country, spotify_artist_id
+- [X] T007 [P] Create Genre model in catalog/models.py with fields: name, slug
+- [X] T008 [P] Create VocalStyle model in catalog/models.py with fields: name, slug
+- [X] T009 Create Album model in catalog/models.py with fields: spotify_album_id, name, artist (FK), genre (FK), vocal_style (FK), release_date, cover_art_url, spotify_url, imported_at, updated_at
+- [X] T010 Add model validation methods to Album model (clean() for spotify URL and ID validation)
+- [X] T011 Create initial migration for catalog models (makemigrations catalog)
+- [X] T012 Create data migration to seed Genre table with 8 progressive metal subgenres
+- [X] T013 Create data migration to seed VocalStyle table with 4 vocal style options
+- [X] T014 Run migrations (migrate catalog)
 
 ### Data Import Infrastructure
 
-- [ ] T015 Create catalog/services/ directory for data fetching logic
-- [ ] T016 [P] Create GoogleSheetsService in catalog/services/google_sheets.py to fetch CSV from export URL
-- [ ] T017 [P] Create SpotifyClient in catalog/services/spotify_client.py using spotipy library with Client Credentials auth
-- [ ] T018 Create AlbumImporter in catalog/services/album_importer.py to orchestrate CSV parsing and Spotify API calls
-- [ ] T019 Create Django management command import_albums in catalog/management/commands/import_albums.py
+- [X] T015 Create catalog/services/ directory for data fetching logic
+- [X] T016 [P] Create GoogleSheetsService in catalog/services/google_sheets.py to fetch CSV from export URL
+- [X] T017 [P] Create SpotifyClient in catalog/services/spotify_client.py using spotipy library with Client Credentials auth
+- [X] T018 Create AlbumImporter in catalog/services/album_importer.py to orchestrate CSV parsing and Spotify API calls
+- [X] T019 Create Django management command import_albums in catalog/management/commands/import_albums.py
 - [ ] T020 [P] Create Django management command sync_spotify in catalog/management/commands/sync_spotify.py for re-syncing existing albums
 
 ### Configuration
 
-- [ ] T021 Add Spotify API settings to config/settings.py (SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET from env vars)
-- [ ] T022 Add Google Sheets CSV URL to config/settings.py (GOOGLE_SHEETS_CSV_URL from env var)
-- [ ] T023 Configure logging for Spotify API calls and data imports in config/settings.py
+- [X] T021 Add Spotify API settings to config/settings.py (SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET from env vars)
+- [X] T022 Add Google Sheets CSV URL to config/settings.py (GOOGLE_SHEETS_CSV_URL from env var)
+- [X] T023 Configure logging for Spotify API calls and data imports in config/settings.py
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -97,15 +97,15 @@ Project uses Django structure with `catalog/` app:
 
 ### Implementation for User Story 1
 
-- [ ] T032 [P] [US1] Create base template catalog/templates/catalog/base.html extending project base with HTMX script
-- [ ] T033 [US1] Create album_list view in catalog/views.py that queries Album.objects with select_related for artist, genre, vocal_style, ordered by -release_date
-- [ ] T034 [US1] Create URL pattern for album_list in catalog/urls.py mapped to / route
-- [ ] T035 [US1] Create album_list.html template in catalog/templates/catalog/ with grid container
-- [ ] T036 [US1] Create album_list_tiles.html fragment template in catalog/templates/catalog/ for HTMX partial updates
-- [ ] T037 [US1] Create album_tile.html component in catalog/templates/catalog/components/ displaying cover, name, artist, date, genre, country, vocal
-- [ ] T038 [US1] Implement responsive grid CSS in catalog/static/catalog/css/album-catalog.css (1-2 cols mobile, 2-3 tablet, 3-4 desktop)
-- [ ] T039 [US1] Add logic to album_list view to detect HX-Request header and return fragment vs full page
-- [ ] T040 [US1] Add placeholder image fallback logic to album_tile template
+- [X] T032 [P] [US1] Create base template catalog/templates/catalog/base.html extending project base with HTMX script
+- [X] T033 [US1] Create album_list view in catalog/views.py that queries Album.objects with select_related for artist, genre, vocal_style, ordered by -release_date
+- [X] T034 [US1] Create URL pattern for album_list in catalog/urls.py mapped to / route
+- [X] T035 [US1] Create album_list.html template in catalog/templates/catalog/ with grid container
+- [X] T036 [US1] Create album_list_tiles.html fragment template in catalog/templates/catalog/ for HTMX partial updates
+- [X] T037 [US1] Create album_tile.html component in catalog/templates/catalog/components/ displaying cover, name, artist, date, genre, country, vocal
+- [X] T038 [US1] Implement responsive grid CSS in catalog/static/catalog/css/album-catalog.css (1-2 cols mobile, 2-3 tablet, 3-4 desktop)
+- [X] T039 [US1] Add logic to album_list view to detect HX-Request header and return fragment vs full page
+- [X] T040 [US1] Add placeholder image fallback logic to album_tile template
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently. Run tests, verify all pass, commit atomically.
 

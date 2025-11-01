@@ -145,6 +145,63 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Spotify API Configuration
+# Required for fetching album metadata from Spotify
+SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID', '')
+SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET', '')
+
+# Google Sheets Configuration
+# XLSX export URL for the r/progmetal releases spreadsheet
+# XLSX format preserves hyperlinks (unlike CSV)
+GOOGLE_SHEETS_XLSX_URL = os.getenv(
+    'GOOGLE_SHEETS_XLSX_URL',
+    'https://docs.google.com/spreadsheets/d/1fQFg52uaojpRCz29EzSHVpsX5SYVJ2VN8IuKs9XA5W8/export?format=xlsx&gid=803985331'
+)
+
+# Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'logs' / 'django.log',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'catalog': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'catalog.services': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'spotipy': {
+            'handlers': ['console', 'file'],
+            'level': 'WARNING',  # Reduce spotipy verbosity
+            'propagate': False,
+        },
+    },
+}
+
 # Test Configuration
 # Force SQLite for tests (faster and isolated)
 import sys
