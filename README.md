@@ -19,38 +19,86 @@ Django web application for browsing and visualizing progressive metal album rele
 
 ## Setup
 
-1. Install dependencies:
+### Option 1: Docker Setup (Recommended)
+
+Docker provides PostgreSQL database and isolated environment:
+
+1. **Prerequisites**: Install [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
+
+2. **Configure environment**:
+   ```bash
+   cp .env.example .env
+   # Edit .env and add your Spotify API credentials
+   # (DATABASE_URL is already configured for Docker in docker-compose.yml)
+   ```
+
+3. **Start services**:
+   ```bash
+   # Start PostgreSQL and Django
+   make up
+
+   # Run migrations
+   make migrate
+
+   # Import test data
+   make import
+   ```
+
+4. **Access application**: http://localhost:8000
+
+5. **Useful commands**:
+   ```bash
+   make logs        # View all logs
+   make shell       # Django shell
+   make test        # Run tests
+   make down        # Stop services
+   make help        # See all commands
+   ```
+
+### Option 2: Local Development (SQLite)
+
+For quick local development without Docker:
+
+1. **Install dependencies**:
    ```bash
    uv sync
    ```
 
-2. Configure environment variables:
-   - Copy `.env.example` to `.env`
-   - Add your Spotify API credentials:
-     - Register app at: https://developer.spotify.com/dashboard
-     - Copy `Client ID` and `Client Secret` to `.env`
-
+2. **Configure environment variables**:
    ```bash
    cp .env.example .env
    # Edit .env and add your Spotify credentials
+   # Leave DATABASE_URL empty to use SQLite
    ```
 
-3. Run migrations:
+3. **Run migrations**:
    ```bash
    python manage.py migrate
    ```
 
-4. Import albums:
+4. **Import albums**:
    ```bash
    # Test with first 3 albums
    python manage.py import_albums --limit 3
 
-   # Import first 50 albums
-   python manage.py import_albums --limit 50
-
    # Import all 2,500+ albums (takes ~10 minutes due to Spotify API rate limits)
    python manage.py import_albums
    ```
+
+5. **Start development server**:
+   ```bash
+   python manage.py runserver
+   ```
+
+## PostgreSQL Connection Details
+
+When using Docker (via `make up`):
+- **Host**: localhost
+- **Port**: 5432
+- **Database**: progmetal
+- **User**: progmetal
+- **Password**: progmetal_dev_password
+- **Connection String**: `postgresql://progmetal:progmetal_dev_password@localhost:5432/progmetal`
 
 ## Running Tests
 
