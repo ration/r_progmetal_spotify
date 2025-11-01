@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database service
+  db:
+    image: postgres:16-alpine
+    container_name: progmetal_db
+    environment:
+      POSTGRES_DB: progmetal
+      POSTGRES_USER: progmetal
+      POSTGRES_PASSWORD: progmetal_dev_password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U progmetal"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Django web application service
+  web:
+    build: .
+    container_name: progmetal_web
+    command: >
+      sh -c "uv run python manage.py migrate &&
+             uv run python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://progmetal:progmetal_dev_password@db:5432/progmetal
+      - DJANGO_SETTINGS_MODULE=config.settings
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    stdin_open: true
+    tty: true
+
+volumes:
+  postgres_data:
