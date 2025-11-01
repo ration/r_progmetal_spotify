@@ -119,13 +119,36 @@ A user wants to find albums with specific vocal styles (clean vocals, harsh voca
 - **SC-006**: The application successfully imports and displays at least 100 album entries from the Google Sheets data source
 - **SC-007**: Missing or invalid data is handled gracefully with clear fallbacks (placeholder images for missing covers, formatted error messages for invalid dates)
 
+## Code Quality Requirements *(mandatory)*
+
+### Type Safety
+- **CQ-001**: All Python code MUST include type annotations for function parameters and return values
+- **CQ-002**: Type annotations MUST be validated using pyright with strict mode enabled
+- **CQ-003**: Type annotations MUST include proper types from typing module (List, Dict, Optional, etc.)
+- **CQ-004**: Django model querysets MUST be properly typed
+- **CQ-005**: No `Any` types allowed without explicit justification in code comments
+
+### Code Quality and Style
+- **CQ-006**: All Python code MUST pass Ruff linting with zero errors
+- **CQ-007**: All Python code MUST pass Ruff static analysis checks
+- **CQ-008**: Code MUST follow PEP 8 style guidelines (enforced by Ruff)
+- **CQ-009**: All functions and classes MUST have docstrings
+- **CQ-010**: Maximum line length: 100 characters (enforced by Ruff)
+
+### Validation Process
+- **CQ-011**: Run `pyright` before committing Python code changes
+- **CQ-012**: Run `ruff check .` before committing Python code changes
+- **CQ-013**: Run `ruff format .` to auto-format code before committing
+- **CQ-014**: All type errors and lint errors MUST be resolved before code review
+
 ## Assumptions
 
-- Album data will be imported from the existing Google Sheets CSV source referenced in the project README
-- The Google Sheets CSV contains columns for all required album attributes (cover URL, name, artist, date, genre, country, vocal style)
-- Cover images are hosted externally and referenced via URL in the CSV data
-- Release dates in the CSV are in a parseable format (ISO 8601 or common date formats)
+- Album data will be imported from the existing Google Sheets XLSX source (preserves Spotify URLs)
+- The Google Sheets contains columns for all required album attributes (Spotify URL, artist, album, genre, vocal style, country, release date)
+- Album metadata (cover art, full details) fetched from Spotify API using album URLs
+- Release dates in Spotify API are in ISO format with precision indicators
 - The application focuses on progressive metal and related subgenres as indicated by the project name "progmetal"
-- Users have modern web browsers with JavaScript enabled
+- Users have modern web browsers with JavaScript enabled (HTMX)
 - The application is primarily for browsing and discovery - no user accounts or personalization features are required for initial release
-- Genre and vocal style values in the CSV use a consistent taxonomy that can be used for filtering
+- Genre and vocal style values will be mapped to database taxonomy during import
+- All Python code follows strict typing and quality standards (pyright + Ruff)

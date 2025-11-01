@@ -19,6 +19,7 @@ dev = [
     "pytest",
     "pyright",
     "pytest-django>=4.11.1",
+    "django-stubs>=5.1.2",
 ]
 ling = [
      "ruff"
@@ -45,4 +46,4 @@ markers = [
 ]
 
 # Django-specific test configuration
-django_find_project = false
+django_find_project = true

@@ -28,14 +28,14 @@ class GoogleSheetsService:
 
     # Expected column names from the r/progmetal releases sheet
     EXPECTED_COLUMNS = {
-        'Artist',
-        'Album',
-        'Release Date',
-        'Length',
-        'Genre / Subgenres',
-        'Vocal Style',
-        'Country / State',
-        'Spotify'
+        "Artist",
+        "Album",
+        "Release Date",
+        "Length",
+        "Genre / Subgenres",
+        "Vocal Style",
+        "Country / State",
+        "Spotify",
     }
 
     def __init__(self, xlsx_url: str):
@@ -63,7 +63,11 @@ class GoogleSheetsService:
             return cell.hyperlink.target
 
         # Check if cell value is a HYPERLINK formula
-        if cell.value and isinstance(cell.value, str) and cell.value.startswith('=HYPERLINK'):
+        if (
+            cell.value
+            and isinstance(cell.value, str)
+            and cell.value.startswith("=HYPERLINK")
+        ):
             # Extract URL from =HYPERLINK("url", "text") formula
             match = re.search(r'=HYPERLINK\("([^"]+)"', cell.value)
             if match:
@@ -86,7 +90,7 @@ class GoogleSheetsService:
         """
         for row_idx in range(1, 20):  # Check first 20 rows
             first_cell = worksheet.cell(row=row_idx, column=1).value
-            if first_cell == 'Artist':
+            if first_cell == "Artist":
                 logger.debug(f"Found header row at row {row_idx}")
                 return row_idx
 
@@ -151,14 +155,14 @@ class GoogleSheetsService:
             albums = []
             row_idx = header_row + 1
             while True:
-                artist_cell = worksheet.cell(row=row_idx, column=col_mapping['Artist'])
+                artist_cell = worksheet.cell(row=row_idx, column=col_mapping["Artist"])
                 artist = artist_cell.value
 
                 # Stop if we hit empty rows
                 if not artist:
                     break
 
-                album_cell = worksheet.cell(row=row_idx, column=col_mapping['Album'])
+                album_cell = worksheet.cell(row=row_idx, column=col_mapping["Album"])
                 album = album_cell.value
 
                 # Skip rows without album name
@@ -167,7 +171,9 @@ class GoogleSheetsService:
                     continue
 
                 # Extract Spotify URL
-                spotify_cell = worksheet.cell(row=row_idx, column=col_mapping['Spotify'])
+                spotify_cell = worksheet.cell(
+                    row=row_idx, column=col_mapping["Spotify"]
+                )
                 spotify_url = self._extract_url_from_cell(spotify_cell)
 
                 # Skip rows without Spotify URL
@@ -177,21 +183,33 @@ class GoogleSheetsService:
 
                 # Extract other fields
                 normalized = {
-                    'artist': str(artist).strip(),
-                    'album': str(album).strip(),
-                    'release_date': str(worksheet.cell(
-                        row=row_idx, column=col_mapping.get('Release Date', 0)
-                    ).value or '').strip(),
-                    'genre': str(worksheet.cell(
-                        row=row_idx, column=col_mapping.get('Genre / Subgenres', 0)
-                    ).value or '').strip(),
-                    'vocal_style': str(worksheet.cell(
-                        row=row_idx, column=col_mapping.get('Vocal Style', 0)
-                    ).value or '').strip(),
-                    'country': str(worksheet.cell(
-                        row=row_idx, column=col_mapping.get('Country / State', 0)
-                    ).value or '').strip(),
-                    'spotify_url': spotify_url
+                    "artist": str(artist).strip(),
+                    "album": str(album).strip(),
+                    "release_date": str(
+                        worksheet.cell(
+                            row=row_idx, column=col_mapping.get("Release Date", 0)
+                        ).value
+                        or ""
+                    ).strip(),
+                    "genre": str(
+                        worksheet.cell(
+                            row=row_idx, column=col_mapping.get("Genre / Subgenres", 0)
+                        ).value
+                        or ""
+                    ).strip(),
+                    "vocal_style": str(
+                        worksheet.cell(
+                            row=row_idx, column=col_mapping.get("Vocal Style", 0)
+                        ).value
+                        or ""
+                    ).strip(),
+                    "country": str(
+                        worksheet.cell(
+                            row=row_idx, column=col_mapping.get("Country / State", 0)
+                        ).value
+                        or ""
+                    ).strip(),
+                    "spotify_url": spotify_url,
                 }
 
                 albums.append(normalized)

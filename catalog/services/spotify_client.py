@@ -40,8 +40,7 @@ class SpotifyClient:
         """
         try:
             auth_manager = SpotifyClientCredentials(
-                client_id=client_id,
-                client_secret=client_secret
+                client_id=client_id, client_secret=client_secret
             )
             self.client = Spotify(auth_manager=auth_manager)
             logger.info("Successfully initialized Spotify client")
@@ -67,7 +66,7 @@ class SpotifyClient:
 
         # Extract album ID using regex
         # Pattern matches: /album/{22-character-id}
-        match = re.search(r'/album/([a-zA-Z0-9]{22})', spotify_url)
+        match = re.search(r"/album/([a-zA-Z0-9]{22})", spotify_url)
         if match:
             album_id = match.group(1)
             logger.debug(f"Extracted album ID {album_id} from URL {spotify_url}")
@@ -105,33 +104,35 @@ class SpotifyClient:
             album_data = self.client.album(album_id)
 
             # Extract primary artist (first artist in list)
-            primary_artist = album_data['artists'][0] if album_data['artists'] else None
+            primary_artist = album_data["artists"][0] if album_data["artists"] else None
             if not primary_artist:
                 logger.warning(f"Album {album_id} has no artists")
                 return None
 
             # Parse release date based on precision
             release_date = self._parse_release_date(
-                album_data.get('release_date', ''),
-                album_data.get('release_date_precision', 'day')
+                album_data.get("release_date", ""),
+                album_data.get("release_date_precision", "day"),
             )
 
             # Get highest resolution cover art
             cover_art_url = None
-            if album_data.get('images'):
+            if album_data.get("images"):
                 # Images are sorted by size (largest first)
-                cover_art_url = album_data['images'][0]['url']
+                cover_art_url = album_data["images"][0]["url"]
 
             metadata = {
-                'album_id': album_data['id'],
-                'name': album_data['name'],
-                'artist_name': primary_artist['name'],
-                'artist_id': primary_artist['id'],
-                'release_date': release_date,
-                'release_date_precision': album_data.get('release_date_precision', 'day'),
-                'cover_art_url': cover_art_url,
-                'spotify_url': album_data['external_urls']['spotify'],
-                'total_tracks': album_data.get('total_tracks', 0)
+                "album_id": album_data["id"],
+                "name": album_data["name"],
+                "artist_name": primary_artist["name"],
+                "artist_id": primary_artist["id"],
+                "release_date": release_date,
+                "release_date_precision": album_data.get(
+                    "release_date_precision", "day"
+                ),
+                "cover_art_url": cover_art_url,
+                "spotify_url": album_data["external_urls"]["spotify"],
+                "total_tracks": album_data.get("total_tracks", 0),
             }
 
             logger.info(
@@ -152,9 +153,7 @@ class SpotifyClient:
             logger.error(f"Unexpected error fetching album {album_id}: {e}")
             return None
 
-    def _parse_release_date(
-        self, date_str: str, precision: str
-    ) -> Optional[date]:
+    def _parse_release_date(self, date_str: str, precision: str) -> Optional[date]:
         """
         Parse Spotify release date based on precision.
 
@@ -175,17 +174,17 @@ class SpotifyClient:
             return None
 
         try:
-            if precision == 'day':
+            if precision == "day":
                 # Full date: YYYY-MM-DD
-                return datetime.strptime(date_str, '%Y-%m-%d').date()
+                return datetime.strptime(date_str, "%Y-%m-%d").date()
 
-            elif precision == 'month':
+            elif precision == "month":
                 # Year and month: YYYY-MM (default to first day of month)
-                return datetime.strptime(date_str, '%Y-%m').date().replace(day=1)
+                return datetime.strptime(date_str, "%Y-%m").date().replace(day=1)
 
-            elif precision == 'year':
+            elif precision == "year":
                 # Year only: YYYY (default to January 1)
-                return datetime.strptime(date_str, '%Y').date().replace(month=1, day=1)
+                return datetime.strptime(date_str, "%Y").date().replace(month=1, day=1)
 
             else:
                 logger.warning(f"Unknown date precision: {precision}")
@@ -219,13 +218,15 @@ class SpotifyClient:
             artist_data = self.client.artist(artist_id)
 
             metadata = {
-                'artist_id': artist_data['id'],
-                'name': artist_data['name'],
-                'genres': artist_data.get('genres', []),
-                'popularity': artist_data.get('popularity', 0)
+                "artist_id": artist_data["id"],
+                "name": artist_data["name"],
+                "genres": artist_data.get("genres", []),
+                "popularity": artist_data.get("popularity", 0),
             }
 
-            logger.info(f"Successfully fetched metadata for artist '{metadata['name']}'")
+            logger.info(
+                f"Successfully fetched metadata for artist '{metadata['name']}'"
+            )
             return metadata
 
         except SpotifyException as e:

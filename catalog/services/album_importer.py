@@ -6,7 +6,7 @@ with metadata from Spotify API. It handles creating/updating Django model instan
 """
 
 import logging
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 from django.db import transaction
 from django.utils.text import slugify
 
@@ -32,7 +32,9 @@ class AlbumImporter:
         spotify_client: SpotifyClient instance
     """
 
-    def __init__(self, sheets_service: GoogleSheetsService, spotify_client: SpotifyClient):
+    def __init__(
+        self, sheets_service: GoogleSheetsService, spotify_client: SpotifyClient
+    ):
         """
         Initialize the album importer.
 
@@ -60,7 +62,9 @@ class AlbumImporter:
         Raises:
             Exception: If import process fails critically
         """
-        logger.info(f"Starting album import (limit={limit}, skip_existing={skip_existing})")
+        logger.info(
+            f"Starting album import (limit={limit}, skip_existing={skip_existing})"
+        )
 
         try:
             # Fetch album data from Google Sheets
@@ -84,7 +88,7 @@ class AlbumImporter:
 
                     # Extract Spotify album ID from URL
                     album_id = self.spotify_client.extract_album_id(
-                        sheets_data['spotify_url']
+                        sheets_data["spotify_url"]
                     )
                     if not album_id:
                         logger.warning(
@@ -95,9 +99,10 @@ class AlbumImporter:
                         continue
 
                     # Check if album already exists
-                    if skip_existing and Album.objects.filter(
-                        spotify_album_id=album_id
-                    ).exists():
+                    if (
+                        skip_existing
+                        and Album.objects.filter(spotify_album_id=album_id).exists()
+                    ):
                         logger.debug(f"Album {album_id} already exists, skipping")
                         skipped_count += 1
                         continue
@@ -139,9 +144,7 @@ class AlbumImporter:
             raise
 
     @transaction.atomic
-    def _import_single_album(
-        self, sheets_data: Dict, spotify_metadata: Dict
-    ) -> bool:
+    def _import_single_album(self, sheets_data: Dict, spotify_metadata: Dict) -> bool:
         """
         Import a single album into the database.
 
@@ -154,36 +157,36 @@ class AlbumImporter:
         """
         # Get or create artist
         artist, _ = Artist.objects.get_or_create(
-            spotify_artist_id=spotify_metadata['artist_id'],
+            spotify_artist_id=spotify_metadata["artist_id"],
             defaults={
-                'name': spotify_metadata['artist_name'],
-                'country': sheets_data.get('country', '')
-            }
+                "name": spotify_metadata["artist_name"],
+                "country": sheets_data.get("country", ""),
+            },
         )
 
         # Update artist country if we have new data and it's not already set
-        if sheets_data.get('country') and not artist.country:
-            artist.country = sheets_data['country']
+        if sheets_data.get("country") and not artist.country:
+            artist.country = sheets_data["country"]
             artist.save()
 
         # Map genre from Google Sheets to our Genre model
-        genre = self._map_genre(sheets_data.get('genre', ''))
+        genre = self._map_genre(sheets_data.get("genre", ""))
 
         # Map vocal style from Google Sheets to our VocalStyle model
-        vocal_style = self._map_vocal_style(sheets_data.get('vocal_style', ''))
+        vocal_style = self._map_vocal_style(sheets_data.get("vocal_style", ""))
 
         # Create or update album
         album, created = Album.objects.update_or_create(
-            spotify_album_id=spotify_metadata['album_id'],
+            spotify_album_id=spotify_metadata["album_id"],
             defaults={
-                'name': spotify_metadata['name'],
-                'artist': artist,
-                'genre': genre,
-                'vocal_style': vocal_style,
-                'release_date': spotify_metadata['release_date'],
-                'cover_art_url': spotify_metadata.get('cover_art_url', ''),
-                'spotify_url': spotify_metadata['spotify_url']
-            }
+                "name": spotify_metadata["name"],
+                "artist": artist,
+                "genre": genre,
+                "vocal_style": vocal_style,
+                "release_date": spotify_metadata["release_date"],
+                "cover_art_url": spotify_metadata.get("cover_art_url", ""),
+                "spotify_url": spotify_metadata["spotify_url"],
+            },
         )
 
         action = "Created" if created else "Updated"
@@ -213,7 +216,7 @@ class AlbumImporter:
             # Default to Progressive Metal
             genre, _ = Genre.objects.get_or_create(
                 name="Progressive Metal",
-                defaults={'slug': slugify("Progressive Metal")}
+                defaults={"slug": slugify("Progressive Metal")},
             )
             return genre
 
@@ -224,7 +227,7 @@ class AlbumImporter:
             pass
 
         # Try matching first part (before comma)
-        first_genre = genre_text.split(',')[0].strip()
+        first_genre = genre_text.split(",")[0].strip()
         try:
             return Genre.objects.get(name__iexact=first_genre)
         except Genre.DoesNotExist:
@@ -236,10 +239,11 @@ class AlbumImporter:
                 return genre
 
         # Default to Progressive Metal if no match found
-        logger.debug(f"No genre match for '{genre_text}', defaulting to Progressive Metal")
+        logger.debug(
+            f"No genre match for '{genre_text}', defaulting to Progressive Metal"
+        )
         genre, _ = Genre.objects.get_or_create(
-            name="Progressive Metal",
-            defaults={'slug': slugify("Progressive Metal")}
+            name="Progressive Metal", defaults={"slug": slugify("Progressive Metal")}
         )
         return genre
 
@@ -260,7 +264,7 @@ class AlbumImporter:
             # Default to Mixed Vocals
             vocal_style, _ = VocalStyle.objects.get_or_create(
                 name="Mixed Vocals (Clean & Harsh)",
-                defaults={'slug': slugify("Mixed Vocals (Clean & Harsh)")}
+                defaults={"slug": slugify("Mixed Vocals (Clean & Harsh)")},
             )
             return vocal_style
 
@@ -274,31 +278,29 @@ class AlbumImporter:
             pass
 
         # Try fuzzy matching
-        if 'instrumental' in normalized or 'no vocal' in normalized:
+        if "instrumental" in normalized or "no vocal" in normalized:
             vocal_style, _ = VocalStyle.objects.get_or_create(
                 name="Instrumental (No Vocals)",
-                defaults={'slug': slugify("Instrumental (No Vocals)")}
+                defaults={"slug": slugify("Instrumental (No Vocals)")},
             )
             return vocal_style
 
-        if 'mixed' in normalized:
+        if "mixed" in normalized:
             vocal_style, _ = VocalStyle.objects.get_or_create(
                 name="Mixed Vocals (Clean & Harsh)",
-                defaults={'slug': slugify("Mixed Vocals (Clean & Harsh)")}
+                defaults={"slug": slugify("Mixed Vocals (Clean & Harsh)")},
             )
             return vocal_style
 
-        if 'clean' in normalized:
+        if "clean" in normalized:
             vocal_style, _ = VocalStyle.objects.get_or_create(
-                name="Clean Vocals",
-                defaults={'slug': slugify("Clean Vocals")}
+                name="Clean Vocals", defaults={"slug": slugify("Clean Vocals")}
             )
             return vocal_style
 
-        if 'harsh' in normalized or 'scream' in normalized or 'growl' in normalized:
+        if "harsh" in normalized or "scream" in normalized or "growl" in normalized:
             vocal_style, _ = VocalStyle.objects.get_or_create(
-                name="Harsh Vocals",
-                defaults={'slug': slugify("Harsh Vocals")}
+                name="Harsh Vocals", defaults={"slug": slugify("Harsh Vocals")}
             )
             return vocal_style
 
@@ -308,7 +310,7 @@ class AlbumImporter:
         )
         vocal_style, _ = VocalStyle.objects.get_or_create(
             name="Mixed Vocals (Clean & Harsh)",
-            defaults={'slug': slugify("Mixed Vocals (Clean & Harsh)")}
+            defaults={"slug": slugify("Mixed Vocals (Clean & Harsh)")},
         )
         return vocal_style
 
