@@ -24,11 +24,15 @@ Django web application for browsing and visualizing progressive metal album rele
    uv sync
    ```
 
-2. Configure environment variables (copy `.env.example` to `.env`):
+2. Configure environment variables:
+   - Copy `.env.example` to `.env`
+   - Add your Spotify API credentials:
+     - Register app at: https://developer.spotify.com/dashboard
+     - Copy `Client ID` and `Client Secret` to `.env`
+
    ```bash
-   SPOTIFY_CLIENT_ID=your_client_id
-   SPOTIFY_CLIENT_SECRET=your_client_secret
-   GOOGLE_SHEETS_XLSX_URL=https://docs.google.com/spreadsheets/d/.../export?format=xlsx&gid=...
+   cp .env.example .env
+   # Edit .env and add your Spotify credentials
    ```
 
 3. Run migrations:
@@ -38,12 +42,28 @@ Django web application for browsing and visualizing progressive metal album rele
 
 4. Import albums:
    ```bash
-   # Test with first 10 albums
-   python manage.py import_albums --limit 10
+   # Test with first 3 albums
+   python manage.py import_albums --limit 3
 
-   # Import all albums
+   # Import first 50 albums
+   python manage.py import_albums --limit 50
+
+   # Import all 2,500+ albums (takes ~10 minutes due to Spotify API rate limits)
    python manage.py import_albums
    ```
+
+## Running Tests
+
+```bash
+# Run all tests
+python -m pytest tests/ -v
+
+# Run specific test file
+python -m pytest tests/test_google_sheets_service.py -v
+
+# Run with coverage
+python -m pytest tests/ --cov=catalog --cov-report=html
+```
 
 ## Architecture
 
