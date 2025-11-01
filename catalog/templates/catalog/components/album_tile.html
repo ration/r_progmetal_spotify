@@ -1,7 +1,10 @@
 {% load static %}
 
 <!-- Album Tile Component -->
-<div class="album-tile card bg-base-100 shadow-xl hover:shadow-2xl transition-all duration-300">
+<a
+    href="{% url 'catalog:album-detail' album.pk %}"
+    class="album-tile card bg-base-100 shadow-xl hover:shadow-2xl transition-all duration-300 cursor-pointer"
+>
     <!-- Album Cover Image -->
     <figure class="album-cover">
         <img
@@ -82,4 +85,4 @@
             </a>
         </div>
     </div>
-</div>
+</a>

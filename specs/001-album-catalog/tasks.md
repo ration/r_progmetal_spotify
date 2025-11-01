@@ -126,12 +126,12 @@ Project uses Django structure with `catalog/` app:
 
 ### Implementation for User Story 2
 
-- [ ] T045 [P] [US2] Create album_detail view in catalog/views.py using get_object_or_404 with select_related
-- [ ] T046 [US2] Create URL pattern for album_detail in catalog/urls.py mapped to /<int:id>/ route
-- [ ] T047 [US2] Create album_detail.html template in catalog/templates/catalog/ with two-column layout (cover + details)
-- [ ] T048 [US2] Add HTMX attributes to album_tile for navigation (hx-get to detail URL, hx-target body, hx-push-url true)
-- [ ] T049 [US2] Style album detail page with large cover image and organized metadata grid
-- [ ] T050 [US2] Add Spotify external link button with target="_blank" and visual styling
+- [X] T045 [P] [US2] Create album_detail view in catalog/views.py using get_object_or_404 with select_related
+- [X] T046 [US2] Create URL pattern for album_detail in catalog/urls.py mapped to /<int:id>/ route
+- [X] T047 [US2] Create album_detail.html template in catalog/templates/catalog/ with two-column layout (cover + details)
+- [X] T048 [US2] Add HTMX attributes to album_tile for navigation (hx-get to detail URL, hx-target body, hx-push-url true)
+- [X] T049 [US2] Style album detail page with large cover image and organized metadata grid
+- [X] T050 [US2] Add Spotify external link button with target="_blank" and visual styling
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently. Users can browse and view details.
 
@@ -152,13 +152,13 @@ Project uses Django structure with `catalog/` app:
 
 ### Implementation for User Story 3
 
-- [ ] T055 [P] [US3] Add genre filter logic to album_list view checking request.GET.get('genre')
-- [ ] T056 [P] [US3] Create filters.html component in catalog/templates/catalog/components/ with genre dropdown
-- [ ] T057 [US3] Add HTMX attributes to genre select (hx-get to album_list URL, hx-target #album-tiles, hx-push-url true)
-- [ ] T058 [US3] Include filters component in album_list.html template above tiles container
-- [ ] T059 [US3] Add "Clear Filters" button with HTMX to reset to unfiltered view
-- [ ] T060 [US3] Add visual indicator for active filter state in UI
-- [ ] T061 [US3] Add empty state message in album_list_tiles template when no albums match filter
+- [X] T055 [P] [US3] Add genre filter logic to album_list view checking request.GET.get('genre')
+- [X] T056 [P] [US3] Create filters.html component in catalog/templates/catalog/components/ with genre dropdown
+- [X] T057 [US3] Add HTMX attributes to genre select (hx-get to album_list URL, hx-target #album-tiles, hx-push-url true)
+- [X] T058 [US3] Include filters component in album_list.html template above tiles container
+- [X] T059 [US3] Add "Clear Filters" button with HTMX to reset to unfiltered view
+- [X] T060 [US3] Add visual indicator for active filter state in UI
+- [X] T061 [US3] Add empty state message in album_list_tiles template when no albums match filter
 
 **Checkpoint**: Genre filtering works independently, can be tested without vocal style filtering
 
@@ -178,12 +178,12 @@ Project uses Django structure with `catalog/` app:
 
 ### Implementation for User Story 4
 
-- [ ] T065 [P] [US4] Add vocal style filter logic to album_list view checking request.GET.get('vocal')
-- [ ] T066 [US4] Add vocal style dropdown to filters.html component
-- [ ] T067 [US4] Add HTMX attributes to vocal style select (same pattern as genre)
-- [ ] T068 [US4] Update filter logic in album_list view to support multiple filters with Q objects
-- [ ] T069 [US4] Update "Clear Filters" button to remove both filter parameters
-- [ ] T070 [US4] Update filter state indicator to show both active filters
+- [X] T065 [P] [US4] Add vocal style filter logic to album_list view checking request.GET.get('vocal')
+- [X] T066 [US4] Add vocal style dropdown to filters.html component
+- [X] T067 [US4] Add HTMX attributes to vocal style select (same pattern as genre)
+- [X] T068 [US4] Update filter logic in album_list view to support multiple filters with Q objects
+- [X] T069 [US4] Update "Clear Filters" button to remove both filter parameters
+- [X] T070 [US4] Update filter state indicator to show both active filters
 
 **Checkpoint**: All user stories complete and independently functional
 
