@@ -79,12 +79,29 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Use DATABASE_URL environment variable if available (PostgreSQL),
+# otherwise fall back to SQLite for development/testing
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+if DATABASE_URL:
+    # PostgreSQL configuration via DATABASE_URL
+    # Format: postgresql://user:password@host:port/dbname
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
-}
+else:
+    # SQLite configuration (default for local development and testing)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -127,3 +144,14 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Test Configuration
+# Force SQLite for tests (faster and isolated)
+import sys
+if 'pytest' in sys.modules or 'test' in sys.argv:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',  # Use in-memory database for tests
+        }
+    }

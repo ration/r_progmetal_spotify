@@ -11,6 +11,7 @@ dependencies = [
     "spotipy ~= 2.24.0",
     "openpyxl>=3.1.5",
     "python-dotenv>=1.2.1",
+    "dj-database-url>=3.0.1",
 ]
 
 [dependency-groups]
@@ -25,3 +26,23 @@ ling = [
 
 [tool.uv]
 default-groups = "all"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+testpaths = ["tests"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+# Django-specific test configuration
+django_find_project = false
