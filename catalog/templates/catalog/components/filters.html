@@ -62,16 +62,24 @@
     <div class="mt-4 flex gap-2 flex-wrap">
         <span class="text-sm font-semibold">Active filters:</span>
         {% if active_genre %}
-        <span class="badge badge-primary gap-2">
-            Genre: {{ genres|filter_by_slug:active_genre|first_name }}
-            <a href="?{% if active_vocal %}vocal={{ active_vocal }}{% endif %}" class="hover:text-white">✕</a>
-        </span>
+            {% for genre in genres %}
+                {% if genre.slug == active_genre %}
+                <span class="badge badge-primary gap-2">
+                    Genre: {{ genre.name }}
+                    <a href="?{% if active_vocal %}vocal={{ active_vocal }}{% endif %}" class="hover:text-white">✕</a>
+                </span>
+                {% endif %}
+            {% endfor %}
         {% endif %}
         {% if active_vocal %}
-        <span class="badge badge-primary gap-2">
-            Vocal: {{ vocal_styles|filter_by_slug:active_vocal|first_name }}
-            <a href="?{% if active_genre %}genre={{ active_genre }}{% endif %}" class="hover:text-white">✕</a>
-        </span>
+            {% for vocal in vocal_styles %}
+                {% if vocal.slug == active_vocal %}
+                <span class="badge badge-primary gap-2">
+                    Vocal: {{ vocal.name }}
+                    <a href="?{% if active_genre %}genre={{ active_genre }}{% endif %}" class="hover:text-white">✕</a>
+                </span>
+                {% endif %}
+            {% endfor %}
         {% endif %}
     </div>
     {% endif %}
