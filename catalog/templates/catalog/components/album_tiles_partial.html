@@ -1,0 +1,46 @@
+{% load static %}
+
+<!-- HTMX Fragment: Album Tiles with Pagination -->
+<!-- This fragment is returned when HX-Request header is present -->
+<!-- It contains the album grid and pagination controls -->
+
+{% if albums %}
+    <div class="album-grid">
+        {% for album in albums %}
+            {% include "catalog/components/album_tile.html" with album=album %}
+        {% endfor %}
+    </div>
+
+    <!-- Pagination Controls -->
+    {% include "catalog/components/pagination.html" %}
+{% else %}
+    <!-- Empty State when no albums match filter/search -->
+    <div class="col-span-full flex flex-col items-center justify-center py-16 text-center">
+        <div class="text-6xl mb-4">🎵</div>
+        <h2 class="text-2xl font-bold mb-2">No Albums Found</h2>
+        {% if search_query %}
+            <p class="text-base-content/70 mb-4">
+                No albums found matching "{{ search_query }}"
+            </p>
+            <button type="button"
+                    class="btn btn-primary"
+                    hx-get="{% url 'catalog:album-list' %}"
+                    hx-target="#album-tiles"
+                    hx-push-url="true"
+                    hx-swap="innerHTML"
+                    onclick="document.getElementById('search-input').value=''">
+                Clear search
+            </button>
+        {% else %}
+            <p class="text-base-content/70 mb-4">
+                No albums match the current filter criteria.
+            </p>
+            <div class="alert alert-info max-w-md">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>Try clearing the filters to see all albums.</span>
+            </div>
+        {% endif %}
+    </div>
+{% endif %}
