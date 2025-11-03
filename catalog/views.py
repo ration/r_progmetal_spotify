@@ -5,7 +5,7 @@ from typing import Any
 from django.db.models import QuerySet
 from django.views.generic import ListView, DetailView
 
-from catalog.models import Album, Genre, VocalStyle
+from catalog.models import Album, Genre, VocalStyle, SyncRecord
 
 
 class AlbumListView(ListView):
@@ -94,6 +94,10 @@ class AlbumListView(ListView):
         context["has_active_filters"] = bool(
             context["active_genre"] or context["active_vocal"]
         )
+
+        # Add synchronization statistics
+        context["latest_sync"] = SyncRecord.objects.filter(success=True).first()
+        context["total_albums"] = Album.objects.count()
 
         return context
 

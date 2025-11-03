@@ -244,3 +244,68 @@ class Album(models.Model):
         if self.release_date and self.release_date > timezone.now().date():
             # This is acceptable for pre-orders, just a note
             pass
+
+
+class SyncRecord(models.Model):
+    """
+    Records catalog synchronization operations.
+
+    Tracks metadata about each sync run to enable display of synchronization
+    statistics to users (last sync time, albums added, total count).
+
+    Attributes:
+        sync_timestamp: When this synchronization completed
+        albums_created: Number of new albums added during this sync
+        albums_updated: Number of existing albums updated during this sync
+        albums_skipped: Number of albums skipped (already current)
+        total_albums_in_catalog: Total album count in catalog after this sync
+        success: Whether sync completed successfully
+        error_message: Error details if sync failed
+    """
+
+    sync_timestamp = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True,
+        help_text="When this synchronization completed",
+    )
+    albums_created = models.IntegerField(
+        default=0, help_text="Number of new albums added during this sync"
+    )
+    albums_updated = models.IntegerField(
+        default=0, help_text="Number of existing albums updated during this sync"
+    )
+    albums_skipped = models.IntegerField(
+        default=0, help_text="Number of albums skipped (already current)"
+    )
+    total_albums_in_catalog = models.IntegerField(
+        help_text="Total album count in catalog after this sync"
+    )
+    success = models.BooleanField(
+        default=True, help_text="Whether sync completed successfully"
+    )
+    error_message = models.TextField(
+        blank=True, null=True, help_text="Error details if sync failed"
+    )
+
+    class Meta:
+        ordering = ["-sync_timestamp"]
+        verbose_name = "Sync Record"
+        verbose_name_plural = "Sync Records"
+        indexes = [
+            models.Index(fields=["-sync_timestamp"], name="idx_sync_timestamp_desc")
+        ]
+
+    def __str__(self) -> str:
+        """String representation for admin interface."""
+        status = "Success" if self.success else "Failed"
+        timestamp_str = self.sync_timestamp.strftime("%Y-%m-%d %H:%M")
+        return f"Sync at {timestamp_str} - {status}"
+
+    def albums_added_display(self) -> str:
+        """Format albums_created for display (e.g., '+15 new' or '+0 new')."""
+        return f"+{self.albums_created} new" if self.albums_created > 0 else "+0 new"
+
+    @property
+    def total_changes(self) -> int:
+        """Total albums affected by this sync (created + updated)."""
+        return self.albums_created + self.albums_updated

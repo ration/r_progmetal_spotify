@@ -1,4 +1,5 @@
 {% load static %}
+{% load humanize %}
 
 <!-- Album Tile Component -->
 <a
@@ -66,6 +67,14 @@
             <div class="flex items-center gap-2">
                 <span class="text-base-content/60">🌍</span>
                 <span class="font-medium">{{ album.artist.country }}</span>
+            </div>
+            {% endif %}
+
+            <!-- Import Timestamp -->
+            {% if album.imported_at %}
+            <div class="flex items-center gap-2">
+                <span class="text-base-content/60">⏱️</span>
+                <span class="text-xs text-base-content/50">Added {{ album.imported_at|naturaltime }}</span>
             </div>
             {% endif %}
         </div>

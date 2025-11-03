@@ -146,3 +146,10 @@ python manage.py sync_spotify --all  # Re-sync all albums with Spotify
 - Static files are configured but may need collection for production: `python manage.py collectstatic`
 - Secret key is currently set to a development value and should be changed for production
 - Spotify API rate limit: ~180 requests per 30 seconds (handled by import script with backoff)
+
+## Active Technologies
+- Python 3.14 + Django 5.2.8, django-htmx, psycopg (PostgreSQL adapter) (002-catalog-statistics)
+- PostgreSQL (production/Docker), SQLite (local development/tests) (002-catalog-statistics)
+
+## Recent Changes
+- 002-catalog-statistics: Added Python 3.14 + Django 5.2.8, django-htmx, psycopg (PostgreSQL adapter)

@@ -8,6 +8,7 @@ Usage:
 import os
 from django.core.management.base import BaseCommand, CommandError
 
+from catalog.models import Album, SyncRecord
 from catalog.services.google_sheets import GoogleSheetsService
 from catalog.services.spotify_client import SpotifyClient
 from catalog.services.album_importer import AlbumImporter
@@ -80,13 +81,39 @@ class Command(BaseCommand):
                     limit=limit, skip_existing=True
                 )
 
+            # Get total album count for sync record
+            total_albums = Album.objects.count()
+
+            # Create sync record to track this import operation
+            SyncRecord.objects.create(
+                albums_created=created,
+                albums_updated=updated,
+                albums_skipped=skipped,
+                total_albums_in_catalog=total_albums,
+                success=True,
+            )
+
             self.stdout.write("")
             self.stdout.write(self.style.MIGRATE_HEADING("Import Results:"))
             self.stdout.write(f"  {self.style.SUCCESS('Created:')} {created}")
             self.stdout.write(f"  {self.style.WARNING('Updated:')} {updated}")
             self.stdout.write(f"  {self.style.NOTICE('Skipped:')} {skipped}")
+            self.stdout.write(f"  Total albums in catalog: {total_albums}")
             self.stdout.write("")
             self.stdout.write(self.style.SUCCESS("✓ Album import complete"))
 
         except Exception as e:
+            # Record failed sync
+            try:
+                SyncRecord.objects.create(
+                    albums_created=0,
+                    albums_updated=0,
+                    albums_skipped=0,
+                    total_albums_in_catalog=Album.objects.count(),
+                    success=False,
+                    error_message=str(e),
+                )
+            except Exception:
+                pass  # Don't fail if we can't record the failure
+
             raise CommandError(f"Import failed: {e}")

@@ -1,0 +1,42 @@
+{% load humanize %}
+
+{# Catalog Statistics Panel - Displays sync freshness, total count, and recent additions #}
+<div class="stats-panel bg-base-200 rounded-lg p-4 mb-6">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+        {# Last Synchronization Time #}
+        <div class="flex-1">
+            {% if latest_sync %}
+                <p class="text-sm text-base-content/70">
+                    <span class="font-semibold">Last synchronized:</span>
+                    {{ latest_sync.sync_timestamp|naturaltime }}
+                </p>
+            {% else %}
+                <p class="text-sm text-base-content/70">
+                    <span class="font-semibold">Status:</span>
+                    Not yet synchronized
+                </p>
+            {% endif %}
+        </div>
+
+        {# Total Albums Count #}
+        <div class="flex-1 text-center">
+            <p class="text-sm text-base-content/70">
+                <span class="font-semibold">Total:</span>
+                {{ total_albums|intcomma }} album{{ total_albums|pluralize }}
+            </p>
+        </div>
+
+        {# Recent Growth Indicator #}
+        <div class="flex-1 text-right">
+            {% if latest_sync and latest_sync.albums_created > 0 %}
+                <p class="text-sm text-success">
+                    <span class="font-semibold">+{{ latest_sync.albums_created|intcomma }} new</span>
+                </p>
+            {% elif latest_sync %}
+                <p class="text-sm text-base-content/50">
+                    <span class="font-semibold">+0 new</span>
+                </p>
+            {% endif %}
+        </div>
+    </div>
+</div>
