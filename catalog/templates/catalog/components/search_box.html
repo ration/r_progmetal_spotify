@@ -1,0 +1,59 @@
+{% load catalog_extras %}
+
+<!-- Search Box with HTMX Debouncing -->
+<div class="mb-6">
+    <div class="form-control">
+        <label for="search-input" class="label">
+            <span class="label-text font-semibold">Search Albums</span>
+        </label>
+        <div class="relative">
+            <input type="search"
+                   id="search-input"
+                   name="q"
+                   value="{{ search_query }}"
+                   placeholder="Search albums, artists, genres, vocal styles..."
+                   class="input input-bordered w-full pr-10"
+                   hx-get="{% url 'catalog:album-list' %}"
+                   hx-trigger="keyup changed delay:500ms, search"
+                   hx-target="#album-tiles"
+                   hx-push-url="true"
+                   hx-swap="innerHTML"
+                   hx-include="[name='genre'], [name='vocal_style'], [name='page_size']"
+                   aria-label="Search albums">
+
+            <!-- Search icon -->
+            <span class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </span>
+        </div>
+
+        {% if search_query %}
+            <!-- Clear search button -->
+            <div class="mt-2">
+                <button type="button"
+                        class="btn btn-sm btn-ghost"
+                        hx-get="{% url 'catalog:album-list' %}"
+                        hx-target="#album-tiles"
+                        hx-push-url="true"
+                        hx-swap="innerHTML"
+                        hx-include="[name='genre'], [name='vocal_style'], [name='page_size']"
+                        onclick="document.getElementById('search-input').value=''">
+                    Clear search
+                </button>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Client-side JavaScript to prevent requests for queries < 3 characters -->
+<script>
+document.addEventListener('htmx:configRequest', (e) => {
+    const searchInput = e.detail.parameters.q;
+    if (searchInput && searchInput.length > 0 && searchInput.length < 3) {
+        // Block request if query is 1-2 characters
+        e.preventDefault();
+    }
+});
+</script>

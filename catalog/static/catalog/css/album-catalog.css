@@ -1,33 +1,71 @@
 /* Album Catalog Styles */
 
-/* Album Tiles Grid Layout */
-#album-tiles,
-.album-grid {
-    display: grid;
-    gap: 1.5rem;
-    padding: 0;
+/* DEBUG: Make it obvious if this CSS loads */
+body {
+    --album-grid-loaded: true;
 }
 
-/* Responsive Grid Breakpoints */
-@media (min-width: 768px) {
-    #album-tiles,
+/* Album Tiles Grid Layout - LARGE tiles for visibility */
+.album-grid {
+    display: grid !important;
+    gap: 2rem !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    /* Mobile: Large single column */
+    grid-template-columns: 1fr !important;
+    background: rgba(255, 0, 0, 0.05) !important; /* DEBUG: Slight red tint */
+}
+
+/* Responsive Grid Breakpoints - Much larger minimum sizes */
+@media (min-width: 640px) {
     .album-grid {
-        grid-template-columns: repeat(2, 1fr);
+        /* Small tablets: 2 columns, minimum 300px each */
+        grid-template-columns: repeat(2, 1fr) !important;
     }
 }
 
 @media (min-width: 1024px) {
-    #album-tiles,
     .album-grid {
-        grid-template-columns: repeat(3, 1fr);
+        /* Desktop: 3 columns, minimum 350px each */
+        grid-template-columns: repeat(3, 1fr) !important;
     }
 }
 
 @media (min-width: 1536px) {
-    #album-tiles,
     .album-grid {
-        grid-template-columns: repeat(4, 1fr);
+        /* Large desktop: 4 columns, minimum 400px each */
+        grid-template-columns: repeat(4, 1fr) !important;
     }
+}
+
+@media (min-width: 1920px) {
+    .album-grid {
+        /* Extra large: 5 columns */
+        grid-template-columns: repeat(5, 1fr) !important;
+    }
+}
+
+/* Ensure parent containers don't restrict width */
+#album-tiles {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: rgba(0, 255, 0, 0.05) !important; /* DEBUG: Slight green tint */
+}
+
+/* Force all parent containers to be full width */
+.max-w-7xl,
+.container {
+    max-width: none !important;
+    width: 100% !important;
+}
+
+/* Override any Tailwind container classes */
+[class*="max-w-"] {
+    max-width: none !important;
 }
 
 /* Album Tile Card */
@@ -42,12 +80,33 @@
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
 }
 
-/* Album Cover Image */
-.album-cover {
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    object-fit: cover;
-    background-color: #e5e7eb;
+/* Album Cover Image - Firefox-compatible */
+.album-tile .album-cover {
+    width: 100% !important;
+    height: 0 !important;
+    padding-bottom: 100% !important; /* Creates 1:1 ratio - works in all browsers */
+    position: relative !important;
+    overflow: hidden !important;
+    background-color: #e5e7eb !important;
+    margin: 0 !important;
+    display: block !important;
+}
+
+.album-tile .album-cover img {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: cover !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
 }
 
 /* Album Info */

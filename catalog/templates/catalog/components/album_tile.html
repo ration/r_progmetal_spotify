@@ -7,14 +7,13 @@
     class="album-tile card bg-base-100 shadow-xl hover:shadow-2xl transition-all duration-300 cursor-pointer"
 >
     <!-- Album Cover Image -->
-    <figure class="album-cover">
+    <div class="album-cover">
         <img
             src="{{ album.get_cover_art_or_placeholder }}"
             alt="{{ album.name }} by {{ album.artist.name }}"
-            class="w-full h-full object-cover"
             loading="lazy"
         />
-    </figure>
+    </div>
 
     <!-- Album Information -->
     <div class="card-body p-4">
