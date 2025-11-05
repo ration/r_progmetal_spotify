@@ -8,4 +8,6 @@ app_name = "catalog"
 urlpatterns = [
     path("", views.AlbumListView.as_view(), name="album-list"),
     path("<int:pk>/", views.AlbumDetailView.as_view(), name="album-detail"),
+    path("sync/trigger/", views.sync_trigger, name="sync-trigger"),
+    path("sync/status/", views.sync_status, name="sync-status"),
 ]

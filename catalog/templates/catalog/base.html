@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{% csrf_token %}">
     <title>{% block title %}Progressive Metal Album Catalog{% endblock %}</title>
 
     <!-- Tailwind CSS v4 + DaisyUI v5 -->
@@ -11,6 +12,15 @@
 
     <!-- HTMX for interactive features -->
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+
+    <!-- Configure HTMX to include CSRF token in requests -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.body.addEventListener('htmx:configRequest', function(event) {
+                event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+            });
+        });
+    </script>
 
     <!-- Custom CSS -->
     {% load static %}

@@ -1,0 +1,19 @@
+{% load static %}
+
+<!-- Sync Button Component -->
+<div class="mb-6">
+    <button
+        class="btn btn-primary"
+        hx-post="{% url 'catalog:sync-trigger' %}"
+        hx-target="#sync-status"
+        hx-swap="innerHTML"
+        hx-disabled-elt="this"
+        hx-indicator="#sync-spinner">
+        <span id="sync-spinner" class="loading loading-spinner loading-sm htmx-indicator"></span>
+        Sync Now
+    </button>
+
+    <span class="text-sm text-base-content/70 ml-4">
+        Synchronize album catalog with Google Sheets and Spotify
+    </span>
+</div>

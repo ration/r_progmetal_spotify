@@ -1,11 +1,17 @@
 """Views for the Album Catalog application."""
 
+import os
 from typing import Any
 
+from django.db import transaction
 from django.db.models import Q, QuerySet
+from django.http import HttpRequest, HttpResponse
+from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.http import require_http_methods
 from django.views.generic import ListView, DetailView
 
-from catalog.models import Album, Genre, VocalStyle, SyncRecord
+from catalog.models import Album, Genre, VocalStyle, SyncOperation, SyncRecord
+from catalog.services.sync_manager import SyncManager
 
 
 class AlbumListView(ListView):
@@ -40,9 +46,9 @@ class AlbumListView(ListView):
         Returns:
             int: Number of items per page (25, 50, or 100)
         """
-        page_size = self.request.GET.get("page_size", self.paginate_by)
+        page_size_param = self.request.GET.get("page_size", str(self.paginate_by))
         try:
-            page_size = int(page_size)
+            page_size = int(page_size_param)
             # Validate against allowed values
             if page_size in [25, 50, 100]:
                 return page_size
@@ -88,10 +94,10 @@ class AlbumListView(ListView):
         search_query = self.request.GET.get("q", "").strip()
         if search_query and len(search_query) >= 3:
             queryset = queryset.filter(
-                Q(name__icontains=search_query) |
-                Q(artist__name__icontains=search_query) |
-                Q(genre__name__icontains=search_query) |
-                Q(vocal_style__name__icontains=search_query)
+                Q(name__icontains=search_query)
+                | Q(artist__name__icontains=search_query)
+                | Q(genre__name__icontains=search_query)
+                | Q(vocal_style__name__icontains=search_query)
             ).distinct()
 
         # Filter by genre if provided
@@ -181,3 +187,227 @@ class AlbumDetailView(DetailView):
         album = self.get_object()
         context["page_title"] = f"{album.name} by {album.artist.name}"
         return context
+
+
+@csrf_protect
+@require_http_methods(["POST"])
+def sync_trigger(request: HttpRequest) -> HttpResponse:
+    """
+    Trigger a manual synchronization operation.
+
+    Creates a new SyncOperation and starts a background thread to perform
+    the sync. Returns immediately with 202 Accepted status.
+
+    Error Handling:
+    - 409 Conflict: If a sync is already running
+    - 503 Service Unavailable: If Spotify credentials are missing
+
+    Args:
+        request: HTTP POST request (requires CSRF token)
+
+    Returns:
+        HttpResponse: 202 with HX-Trigger header on success, error HTML on failure
+    """
+    # Check for missing Spotify credentials
+    spotify_client_id = os.getenv("SPOTIFY_CLIENT_ID")
+    spotify_client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
+
+    if not spotify_client_id or not spotify_client_secret:
+        html = """
+        <div class="alert alert-error">
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+                <div class="font-bold">Configuration Error</div>
+                <div class="text-sm">Spotify credentials not configured. Please set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET environment variables.</div>
+            </div>
+        </div>
+        """
+        return HttpResponse(html, status=503, content_type="text/html")
+
+    # Check for active sync with database lock
+    try:
+        with transaction.atomic():
+            active_sync = (
+                SyncOperation.objects.filter(Q(status="pending") | Q(status="running"))
+                .select_for_update(nowait=True)
+                .first()
+            )
+
+            if active_sync:
+                html = """
+                <div class="alert alert-warning">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span>Synchronization already in progress. Please wait for it to complete.</span>
+                </div>
+                """
+                return HttpResponse(html, status=409, content_type="text/html")
+
+            # Create new sync operation
+            sync_op = SyncOperation.objects.create(
+                status="pending",
+                created_by_ip=request.META.get("REMOTE_ADDR"),
+            )
+
+    except Exception as e:
+        html = f"""
+        <div class="alert alert-error">
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+                <div class="font-bold">Error</div>
+                <div class="text-sm">Unable to start synchronization: {str(e)}</div>
+            </div>
+        </div>
+        """
+        return HttpResponse(html, status=500, content_type="text/html")
+
+    # Start sync in background thread
+    # Note: sync_op.id is set by Django after save() and will always exist here
+    sync_op_id = getattr(sync_op, "id", 0)
+    SyncManager.start_sync(sync_op_id)
+
+    # Return success response with HX-Trigger header
+    html = """
+    <div class="alert alert-info">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <span>Synchronization started. Fetching albums...</span>
+    </div>
+    """
+    response = HttpResponse(html, status=202, content_type="text/html")
+    response["HX-Trigger"] = "syncStarted"
+    return response
+
+
+@require_http_methods(["GET"])
+def sync_status(request: HttpRequest) -> HttpResponse:
+    """
+    Poll for current synchronization status.
+
+    Returns HTML fragment showing current sync progress, or idle state
+    if no sync is active.
+
+    Response Headers:
+    - HX-Trigger: stopPolling (when sync completes)
+    - HX-Trigger: syncCompleted (when sync succeeds)
+
+    Args:
+        request: HTTP GET request
+
+    Returns:
+        HttpResponse: HTML fragment with current status
+    """
+    # Query for active sync operation
+    current_sync = (
+        SyncOperation.objects.filter(Q(status="pending") | Q(status="running"))
+        .order_by("-started_at")
+        .first()
+    )
+
+    # If no active sync, check for recently completed
+    if not current_sync:
+        completed_sync = (
+            SyncOperation.objects.filter(Q(status="completed") | Q(status="failed"))
+            .order_by("-completed_at")
+            .first()
+        )
+
+        if completed_sync and completed_sync.status == "completed":
+            # Show success or warning message based on error_message presence
+            duration = completed_sync.duration()
+            duration_str = (
+                f"{int(duration.total_seconds() // 60)} minutes"
+                if duration
+                else "unknown"
+            )
+
+            # Check if this is a partial failure (has error_message despite completed status)
+            if (
+                completed_sync.error_message
+                and "Warning:" in completed_sync.error_message
+            ):
+                # Partial success - show warning
+                html = f"""
+                <div class="alert alert-warning">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div>
+                        <div class="font-bold">Sync Completed with Warnings</div>
+                        <div class="text-sm">{completed_sync.error_message}</div>
+                        <div class="text-sm mt-1">Completed in {duration_str}.</div>
+                    </div>
+                </div>
+                """
+            else:
+                # Full success
+                html = f"""
+                <div class="alert alert-success">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                        <div class="font-bold">Sync Complete!</div>
+                        <div class="text-sm">Updated {completed_sync.albums_processed} albums successfully. Completed in {duration_str}.</div>
+                    </div>
+                </div>
+                """
+
+            response = HttpResponse(html, content_type="text/html")
+            response["HX-Trigger"] = "syncCompleted, stopPolling"
+            return response
+
+        elif completed_sync and completed_sync.status == "failed":
+            # Show error message
+            html = f"""
+            <div class="alert alert-error">
+                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                    <div class="font-bold">Sync Failed</div>
+                    <div class="text-sm">{completed_sync.error_message or "An unknown error occurred."}</div>
+                </div>
+            </div>
+            """
+            response = HttpResponse(html, content_type="text/html")
+            response["HX-Trigger"] = "syncFailed, stopPolling"
+            return response
+
+        # No sync active or recently completed
+        html = '<div class="text-sm text-base-content/70">No synchronization in progress.</div>'
+        return HttpResponse(html, content_type="text/html")
+
+    # Sync is active - show progress
+    progress_pct = current_sync.progress_percentage()
+    duration = current_sync.duration()
+    duration_str = (
+        f"{int(duration.total_seconds() // 60)} minutes" if duration else "0 minutes"
+    )
+
+    html = f"""
+    <div class="flex items-center gap-4">
+        <span class="loading loading-spinner loading-md"></span>
+        <div class="flex-1">
+            <div class="font-semibold">{current_sync.display_status()}</div>
+            <div class="text-sm text-base-content/70">Processing albums from Google Sheets and Spotify</div>
+            """
+
+    if progress_pct is not None:
+        html += f"""
+            <progress class="progress progress-primary w-full mt-2" value="{progress_pct}" max="100"></progress>
+            <div class="text-xs text-base-content/60 mt-1">{progress_pct}% complete • Started {duration_str} ago</div>
+        """
+
+    html += """
+        </div>
+    </div>
+    """
+
+    return HttpResponse(html, content_type="text/html")
