@@ -1,0 +1,10 @@
+<!-- Sync Status Component -->
+<div
+    id="sync-status"
+    hx-get="{% url 'catalog:sync-status' %}"
+    hx-trigger="syncStarted from:body, every 2s"
+    hx-swap="innerHTML"
+    class="mb-6">
+    <!-- Status updates appear here via HTMX -->
+    <div class="text-sm text-base-content/70">Ready to synchronize.</div>
+</div>

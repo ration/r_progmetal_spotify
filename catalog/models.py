@@ -6,6 +6,7 @@ information. Album data is sourced from Google Sheets CSV and enriched via Spoti
 """
 
 from __future__ import annotations
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from django.db import models
@@ -309,3 +310,136 @@ class SyncRecord(models.Model):
     def total_changes(self) -> int:
         """Total albums affected by this sync (created + updated)."""
         return self.albums_created + self.albums_updated
+
+
+class SyncOperation(models.Model):
+    """
+    Tracks real-time status and progress of an active synchronization operation.
+
+    This model is used for in-progress sync operations to enable status polling
+    and progress display. When a sync completes, a SyncRecord is created for
+    historical logging.
+
+    Attributes:
+        status: Current operation state (pending, running, completed, failed)
+        stage: Current sync stage (fetching, processing, finalizing)
+        stage_message: Human-readable status text for UI display
+        albums_processed: Number of albums processed so far
+        total_albums: Total albums to process (set after fetching from Google Sheets)
+        started_at: When sync operation began
+        completed_at: When sync operation finished (success or failure)
+        error_message: Error details if status is failed
+        created_by_ip: IP address that triggered sync (for audit logging)
+    """
+
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("running", "Running"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
+    ]
+
+    STAGE_CHOICES = [
+        ("fetching", "Fetching"),
+        ("processing", "Processing"),
+        ("finalizing", "Finalizing"),
+    ]
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending",
+        help_text="Current operation state",
+        db_index=True,
+    )
+    stage = models.CharField(
+        max_length=50,
+        choices=STAGE_CHOICES,
+        blank=True,
+        help_text="Current sync stage",
+    )
+    stage_message = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Human-readable status text",
+    )
+    albums_processed = models.IntegerField(
+        default=0, help_text="Number of albums processed so far"
+    )
+    total_albums = models.IntegerField(
+        null=True, blank=True, help_text="Total albums to process"
+    )
+    started_at = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True,
+        help_text="When sync operation began",
+    )
+    completed_at = models.DateTimeField(
+        null=True, blank=True, help_text="When sync operation finished"
+    )
+    error_message = models.TextField(
+        blank=True, help_text="Error details if status is failed"
+    )
+    created_by_ip = models.GenericIPAddressField(
+        null=True, blank=True, help_text="IP address that triggered sync"
+    )
+
+    class Meta:
+        ordering = ["-started_at"]
+        verbose_name = "Sync Operation"
+        verbose_name_plural = "Sync Operations"
+        indexes = [
+            models.Index(fields=["status"], name="idx_sync_op_status"),
+            models.Index(fields=["-started_at"], name="idx_sync_op_started"),
+        ]
+
+    def __str__(self) -> str:
+        """String representation for admin interface."""
+        # Note: self.id is a Django-added attribute for primary key
+        sync_id = getattr(self, "id", "unknown")
+        return f"Sync {sync_id} - {self.status} ({self.started_at.strftime('%Y-%m-%d %H:%M')})"
+
+    def progress_percentage(self) -> int | None:
+        """
+        Calculate completion percentage (0-100) or None if total unknown.
+
+        Returns:
+            int: Progress percentage (0-100), or None if total_albums is not set
+        """
+        if self.total_albums and self.total_albums > 0:
+            return min(100, int((self.albums_processed / self.total_albums) * 100))
+        return None
+
+    def duration(self) -> timedelta | None:
+        """
+        Calculate sync duration or current duration if running.
+
+        Returns:
+            timedelta: Duration from start to completion (or current time if running)
+        """
+        if self.completed_at:
+            return self.completed_at - self.started_at
+        elif self.status == "running":
+            return timezone.now() - self.started_at
+        return None
+
+    def is_active(self) -> bool:
+        """
+        Return True if sync is pending or running.
+
+        Returns:
+            bool: True if status is pending or running
+        """
+        return self.status in ("pending", "running")
+
+    def display_status(self) -> str:
+        """
+        Return human-readable status for UI display.
+
+        Returns:
+            str: Stage message if present, otherwise formatted status
+        """
+        if self.stage_message:
+            return self.stage_message
+        # Note: get_status_display is a Django-added method for choice fields
+        return f"Status: {getattr(self, 'get_status_display', lambda: self.status)()}"
