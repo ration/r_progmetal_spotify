@@ -29,12 +29,37 @@ class Command(BaseCommand):
             action="store_true",
             help="Sync mode: update existing albums instead of skipping them",
         )
+        parser.add_argument(
+            "--skip-spotify",
+            action="store_true",
+            default=True,
+            help="Skip Spotify API calls during import (default: True). "
+            "Album cover art and metadata will be fetched on-demand when viewed.",
+        )
+        parser.add_argument(
+            "--no-skip-spotify",
+            action="store_false",
+            dest="skip_spotify",
+            help="Fetch Spotify metadata during import (pre-populate cache). "
+            "Useful for pre-warming cache but slower.",
+        )
 
     def handle(self, *args, **options):
         limit = options["limit"]
         sync_mode = options["sync"]
+        skip_spotify = options["skip_spotify"]
 
         self.stdout.write(self.style.MIGRATE_HEADING("Album Import Starting"))
+        if skip_spotify:
+            self.stdout.write(
+                self.style.WARNING(
+                    "  Mode: Just-in-Time (skipping Spotify API during import)"
+                )
+            )
+        else:
+            self.stdout.write(
+                self.style.NOTICE("  Mode: Eager Loading (fetching Spotify metadata)")
+            )
         self.stdout.write("")
 
         # Validate required environment variables
@@ -42,10 +67,12 @@ class Command(BaseCommand):
         spotify_client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
         sheets_url = os.getenv("GOOGLE_SHEETS_XLSX_URL")
 
-        if not spotify_client_id or not spotify_client_secret:
+        # Spotify credentials only required if not skipping Spotify
+        if not skip_spotify and (not spotify_client_id or not spotify_client_secret):
             raise CommandError(
                 "Spotify credentials not found. Please set SPOTIFY_CLIENT_ID "
-                "and SPOTIFY_CLIENT_SECRET environment variables."
+                "and SPOTIFY_CLIENT_SECRET environment variables. "
+                "Or use --skip-spotify to import without Spotify metadata."
             )
 
         if not sheets_url:
@@ -58,7 +85,12 @@ class Command(BaseCommand):
         self.stdout.write("Initializing services...")
         try:
             sheets_service = GoogleSheetsService(sheets_url)
-            spotify_client = SpotifyClient(spotify_client_id, spotify_client_secret)
+
+            # Initialize Spotify client only if needed
+            spotify_client = None
+            if not skip_spotify:
+                spotify_client = SpotifyClient(spotify_client_id, spotify_client_secret)
+
             importer = AlbumImporter(sheets_service, spotify_client)
         except Exception as e:
             raise CommandError(f"Failed to initialize services: {e}")
@@ -75,10 +107,10 @@ class Command(BaseCommand):
 
         try:
             if sync_mode:
-                created, updated, skipped = importer.sync_albums()
+                created, updated, skipped = importer.sync_albums(skip_spotify=skip_spotify)
             else:
                 created, updated, skipped = importer.import_albums(
-                    limit=limit, skip_existing=True
+                    limit=limit, skip_existing=True, skip_spotify=skip_spotify
                 )
 
             # Get total album count for sync record

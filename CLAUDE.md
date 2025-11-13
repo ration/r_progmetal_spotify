@@ -150,6 +150,14 @@ python manage.py sync_spotify --all  # Re-sync all albums with Spotify
 ## Active Technologies
 - Python 3.14 + Django 5.2.8, django-htmx, psycopg (PostgreSQL adapter) (002-catalog-statistics)
 - PostgreSQL (production/Docker), SQLite (local development/tests) (002-catalog-statistics)
+- openpyxl 3.1+ for multi-tab Google Sheets parsing (005-multi-tab-parsing)
+  - Workbook enumeration via `workbook.sheetnames`
+  - Tab filtering by name pattern (ends with "Prog-metal" or matches year regex)
+  - Chronological sorting by extracted year (oldest to newest)
+  - Per-tab album fetching with progress tracking
+  - Tab-level error isolation and recovery
+- Python 3.14 + Django 5.2.8, django-htmx, spotipy (Spotify API client), psycopg (PostgreSQL adapter) (006-jit-spotify-api)
 
 ## Recent Changes
+- 005-multi-tab-parsing: Added multi-tab Google Sheets parsing with openpyxl, tab filtering, chronological processing, and error isolation
 - 002-catalog-statistics: Added Python 3.14 + Django 5.2.8, django-htmx, psycopg (PostgreSQL adapter)

@@ -152,12 +152,18 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID", "")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "")
 
+# Just-in-Time Spotify API settings
+# Maximum concurrent requests to Spotify API
+SPOTIFY_MAX_CONCURRENT = int(os.getenv("SPOTIFY_MAX_CONCURRENT", "10"))
+# Maximum retry attempts on rate limit errors
+SPOTIFY_RETRY_ATTEMPTS = int(os.getenv("SPOTIFY_RETRY_ATTEMPTS", "3"))
+
 # Google Sheets Configuration
 # XLSX export URL for the r/progmetal releases spreadsheet
 # XLSX format preserves hyperlinks (unlike CSV)
 GOOGLE_SHEETS_XLSX_URL = os.getenv(
     "GOOGLE_SHEETS_XLSX_URL",
-    "https://docs.google.com/spreadsheets/d/1fQFg52uaojpRCz29EzSHVpsX5SYVJ2VN8IuKs9XA5W8/export?format=xlsx&gid=803985331",
+    "https://docs.google.com/spreadsheets/d/1fQFg52uaojpRCz29EzSHVpsX5SYVJ2VN8IuKs9XA5W8/export?format=xlsx",
 )
 
 # Logging Configuration

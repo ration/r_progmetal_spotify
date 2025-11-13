@@ -1,17 +1,23 @@
 """Views for the Album Catalog application."""
 
+import logging
 import os
-from typing import Any
+from typing import Any, Optional
 
 from django.db import transaction
 from django.db.models import Q, QuerySet
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse, Http404
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
 from django.views.generic import ListView, DetailView
+from spotipy.exceptions import SpotifyException
 
 from catalog.models import Album, Genre, VocalStyle, SyncOperation, SyncRecord
 from catalog.services.sync_manager import SyncManager
+from catalog.services.album_cache import get_cached_cover_url, cache_cover_url
+from catalog.services.spotify_client import SpotifyClient
+
+logger = logging.getLogger(__name__)
 
 
 class AlbumListView(ListView):
@@ -80,15 +86,15 @@ class AlbumListView(ListView):
 
         Supports:
         - ?q=<search> - Free-text search (min 3 chars) across album name,
-                        artist name, genre name, vocal style name
-        - ?genre=<slug> - Filter by genre slug
+                        artist name, genre names, vocal style name
+        - ?genre=<slug> - Filter by genre slug (matches any genre for albums with multiple genres)
         - ?vocal=<slug> - Filter by vocal style slug
 
         Returns:
-            QuerySet[Album]: Albums with related artist, genre, and vocal_style
+            QuerySet[Album]: Albums with related artist, vocal_style, and genres
                 pre-fetched, ordered by release_date DESC, then imported_at DESC
         """
-        queryset = Album.objects.select_related("artist", "genre", "vocal_style")
+        queryset = Album.objects.select_related("artist", "vocal_style").prefetch_related("genres")
 
         # Free-text search (minimum 3 characters)
         search_query = self.request.GET.get("q", "").strip()
@@ -96,14 +102,14 @@ class AlbumListView(ListView):
             queryset = queryset.filter(
                 Q(name__icontains=search_query)
                 | Q(artist__name__icontains=search_query)
-                | Q(genre__name__icontains=search_query)
+                | Q(genres__name__icontains=search_query)
                 | Q(vocal_style__name__icontains=search_query)
             ).distinct()
 
-        # Filter by genre if provided
+        # Filter by genre if provided (matches any album with this genre)
         genre_slug = self.request.GET.get("genre")
         if genre_slug:
-            queryset = queryset.filter(genre__slug=genre_slug)
+            queryset = queryset.filter(genres__slug=genre_slug)
 
         # Filter by vocal style if provided
         vocal_slug = self.request.GET.get("vocal")
@@ -198,9 +204,11 @@ def sync_trigger(request: HttpRequest) -> HttpResponse:
     Creates a new SyncOperation and starts a background thread to perform
     the sync. Returns immediately with 202 Accepted status.
 
+    Note: Sync no longer requires Spotify credentials (JIT mode). Cover art
+    will be loaded on-demand when albums are viewed in the catalog.
+
     Error Handling:
     - 409 Conflict: If a sync is already running
-    - 503 Service Unavailable: If Spotify credentials are missing
 
     Args:
         request: HTTP POST request (requires CSRF token)
@@ -208,24 +216,6 @@ def sync_trigger(request: HttpRequest) -> HttpResponse:
     Returns:
         HttpResponse: 202 with HX-Trigger header on success, error HTML on failure
     """
-    # Check for missing Spotify credentials
-    spotify_client_id = os.getenv("SPOTIFY_CLIENT_ID")
-    spotify_client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
-
-    if not spotify_client_id or not spotify_client_secret:
-        html = """
-        <div class="alert alert-error">
-            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-                <div class="font-bold">Configuration Error</div>
-                <div class="text-sm">Spotify credentials not configured. Please set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET environment variables.</div>
-            </div>
-        </div>
-        """
-        return HttpResponse(html, status=503, content_type="text/html")
-
     # Check for active sync with database lock
     try:
         with transaction.atomic():
@@ -283,6 +273,130 @@ def sync_trigger(request: HttpRequest) -> HttpResponse:
     response = HttpResponse(html, status=202, content_type="text/html")
     response["HX-Trigger"] = "syncStarted"
     return response
+
+
+@csrf_protect
+@require_http_methods(["POST"])
+def sync_stop(request: HttpRequest) -> HttpResponse:
+    """
+    Stop an ongoing synchronization operation.
+
+    Sets the status to 'cancelled' for the active sync. The sync thread
+    will detect this and gracefully terminate.
+
+    Error Handling:
+    - 404 Not Found: If no active sync operation exists
+
+    Args:
+        request: HTTP POST request (requires CSRF token)
+
+    Returns:
+        HttpResponse: 200 with success message or 404 if no active sync
+    """
+    # Find active sync operation
+    active_sync = (
+        SyncOperation.objects.filter(Q(status="pending") | Q(status="running"))
+        .order_by("-started_at")
+        .first()
+    )
+
+    if not active_sync:
+        html = """
+        <div class="alert alert-warning">
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span>No active synchronization to stop.</span>
+        </div>
+        """
+        return HttpResponse(html, status=404, content_type="text/html")
+
+    # Mark sync as cancelled
+    active_sync.status = "cancelled"
+    active_sync.stage_message = "Cancelling synchronization..."
+    active_sync.save(update_fields=["status", "stage_message"])
+
+    logger.info(f"Sync {active_sync.id} cancellation requested by user")
+
+    # Return success response
+    html = """
+    <div class="alert alert-warning">
+        <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <span>Cancelling synchronization... This may take a moment.</span>
+    </div>
+    """
+    response = HttpResponse(html, status=200, content_type="text/html")
+    response["HX-Trigger"] = "syncStopped"
+    return response
+
+
+@require_http_methods(["GET"])
+def sync_button(request: HttpRequest) -> HttpResponse:
+    """
+    Render the sync/stop button based on current sync state.
+
+    Returns different button HTML depending on whether a sync is active:
+    - Active sync: Show "Stop" button (red)
+    - No active sync: Show "Sync Now" button (primary)
+
+    Args:
+        request: HTTP GET request
+
+    Returns:
+        HttpResponse: HTML fragment with appropriate button
+    """
+    # Check for active sync
+    active_sync = (
+        SyncOperation.objects.filter(Q(status="pending") | Q(status="running"))
+        .order_by("-started_at")
+        .first()
+    )
+
+    if active_sync:
+        # Show Stop button when sync is active
+        html = """
+        <div class="mb-6">
+            <button
+                class="btn btn-error"
+                hx-post="{% url 'catalog:sync-stop' %}"
+                hx-target="#sync-status"
+                hx-swap="innerHTML"
+                hx-disabled-elt="this">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd" />
+                </svg>
+                Stop Sync
+            </button>
+
+            <span class="text-sm text-base-content/70 ml-4">
+                Stop the current synchronization operation
+            </span>
+        </div>
+        """.replace("{% url 'catalog:sync-stop' %}", request.build_absolute_uri('/catalog/sync/stop/').replace(request.build_absolute_uri('/'), '/'))
+    else:
+        # Show Sync Now button when no sync is active
+        html = """
+        <div class="mb-6">
+            <button
+                class="btn btn-primary"
+                hx-post="{% url 'catalog:sync-trigger' %}"
+                hx-target="#sync-status"
+                hx-swap="innerHTML"
+                hx-disabled-elt="this"
+                hx-indicator="#sync-spinner">
+                <span id="sync-spinner" class="loading loading-spinner loading-sm htmx-indicator"></span>
+                Sync Now
+            </button>
+
+            <span class="text-sm text-base-content/70 ml-4">
+                Synchronize album catalog with Google Sheets and Spotify
+            </span>
+        </div>
+        """.replace("{% url 'catalog:sync-trigger' %}", request.build_absolute_uri('/catalog/sync/trigger/').replace(request.build_absolute_uri('/'), '/'))
+
+    return HttpResponse(html, content_type="text/html")
 
 
 @require_http_methods(["GET"])
@@ -363,6 +477,23 @@ def sync_status(request: HttpRequest) -> HttpResponse:
             response["HX-Trigger"] = "syncCompleted, stopPolling"
             return response
 
+        elif completed_sync and completed_sync.status == "cancelled":
+            # Show cancelled message
+            html = f"""
+            <div class="alert alert-warning">
+                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div>
+                    <div class="font-bold">Sync Cancelled</div>
+                    <div class="text-sm">Synchronization was cancelled by user. {completed_sync.albums_processed or 0} albums were processed before cancellation.</div>
+                </div>
+            </div>
+            """
+            response = HttpResponse(html, content_type="text/html")
+            response["HX-Trigger"] = "syncCancelled, stopPolling"
+            return response
+
         elif completed_sync and completed_sync.status == "failed":
             # Show error message
             html = f"""
@@ -406,6 +537,206 @@ def sync_status(request: HttpRequest) -> HttpResponse:
         """
 
     html += """
+        </div>
+    </div>
+    """
+
+    return HttpResponse(html, content_type="text/html")
+
+
+@require_http_methods(["GET"])
+def album_cover_art(request: HttpRequest, album_id: int) -> HttpResponse:
+    """
+    Fetch album cover art using just-in-time (JIT) loading from Spotify API.
+
+    This view implements lazy loading of cover art:
+    1. Check if cover art is cached in database
+    2. If not cached, fetch from Spotify API
+    3. Cache the result for future requests
+    4. Return HTML <img> tag or JSON response
+
+    Supports two response formats:
+    - HTML (default): Returns <img> tag ready for HTMX swap
+    - JSON: Returns {"cover_url": "...", "cached": true/false}
+
+    Error Handling:
+    - 404: Album not found in database
+    - 200 with placeholder: Rate limit, API failure, or missing Spotify URL
+
+    Args:
+        request: HTTP GET request
+            Query params:
+                - format: "json" for JSON response (default: HTML)
+        album_id: Album primary key
+
+    Returns:
+        HttpResponse: HTML fragment with <img> tag or JSON response
+    """
+    # Get album or return 404
+    try:
+        album = Album.objects.select_related("artist").get(id=album_id)
+    except Album.DoesNotExist:
+        raise Http404("Album not found")
+
+    # Determine response format
+    response_format = request.GET.get("format", "html").lower()
+
+    # Check if album has Spotify URL
+    if not album.spotify_album_id or not album.spotify_url:
+        logger.warning(f"Album {album_id} has no Spotify URL")
+        return _render_cover_placeholder(
+            album, "no-spotify", response_format,
+            "Album not available on Spotify"
+        )
+
+    # Check cache first
+    cached_url = get_cached_cover_url(album_id)
+    if cached_url:
+        logger.debug(f"Cache hit for album {album_id} cover art")
+        return _render_cover_art(album, cached_url, response_format, cached=True)
+
+    # Cache miss - fetch from Spotify API
+    logger.debug(f"Cache miss for album {album_id}, fetching from Spotify API")
+
+    try:
+        # Initialize Spotify client
+        spotify_client_id = os.getenv("SPOTIFY_CLIENT_ID")
+        spotify_client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
+
+        if not spotify_client_id or not spotify_client_secret:
+            logger.error("Spotify credentials not configured")
+            return _render_cover_placeholder(
+                album, "unavailable", response_format,
+                "Spotify API credentials not configured"
+            )
+
+        spotify_client = SpotifyClient(spotify_client_id, spotify_client_secret)
+
+        # Fetch cover art from Spotify
+        cover_url = spotify_client.fetch_album_cover(album.spotify_album_id)
+
+        if not cover_url:
+            logger.warning(f"No cover art found for album {album_id}")
+            return _render_cover_placeholder(
+                album, "unavailable", response_format,
+                "Cover art not available"
+            )
+
+        # Cache the cover art URL
+        cache_cover_url(album_id, cover_url)
+        logger.info(f"Cached cover art for album {album_id}")
+
+        return _render_cover_art(album, cover_url, response_format, cached=False)
+
+    except SpotifyException as e:
+        if e.http_status == 429:
+            # Rate limit hit - return skeleton placeholder
+            logger.warning(f"Rate limit hit for album {album_id}")
+            return _render_cover_placeholder(
+                album, "skeleton", response_format,
+                "Rate limit reached. Please try again later."
+            )
+        else:
+            # Other Spotify API error
+            logger.error(f"Spotify API error for album {album_id}: {e}")
+            return _render_cover_placeholder(
+                album, "unavailable", response_format,
+                f"Spotify API error: {e.msg}"
+            )
+
+    except Exception as e:
+        # Unexpected error
+        logger.error(
+            f"Unexpected error fetching cover art for album {album_id}: {e}",
+            exc_info=True
+        )
+        return _render_cover_placeholder(
+            album, "unavailable", response_format,
+            "An unexpected error occurred"
+        )
+
+
+def _render_cover_art(
+    album: Album,
+    cover_url: str,
+    response_format: str,
+    cached: bool
+) -> HttpResponse:
+    """
+    Render cover art as HTML <img> tag or JSON response.
+
+    Args:
+        album: Album model instance
+        cover_url: Spotify cover art URL
+        response_format: "html" or "json"
+        cached: Whether the cover art was retrieved from cache
+
+    Returns:
+        HttpResponse: HTML or JSON response with cover art
+    """
+    if response_format == "json":
+        return JsonResponse({
+            "cover_url": cover_url,
+            "cached": cached,
+            "album_id": album.id,
+            "album_name": album.name,
+            "artist_name": album.artist.name
+        })
+
+    # HTML response with <img> tag
+    html = f"""
+    <img
+        src="{cover_url}"
+        alt="{album.name} by {album.artist.name}"
+        class="w-full h-auto rounded-lg shadow-lg fade-in"
+        loading="lazy"
+    />
+    """
+    response = HttpResponse(html, content_type="text/html")
+    response["HX-Trigger"] = "cover-art-loaded"
+    return response
+
+
+def _render_cover_placeholder(
+    album: Album,
+    placeholder_type: str,
+    response_format: str,
+    message: str
+) -> HttpResponse:
+    """
+    Render placeholder for missing/unavailable cover art.
+
+    Args:
+        album: Album model instance
+        placeholder_type: "skeleton", "unavailable", or "no-spotify"
+        response_format: "html" or "json"
+        message: Error/info message to display
+
+    Returns:
+        HttpResponse: HTML or JSON response with placeholder
+    """
+    if response_format == "json":
+        return JsonResponse({
+            "cover_url": None,
+            "cached": False,
+            "placeholder_type": placeholder_type,
+            "message": message,
+            "album_id": album.id,
+            "album_name": album.name,
+            "artist_name": album.artist.name
+        })
+
+    # HTML response with placeholder
+    # Use different styles based on placeholder type
+    placeholder_class = "skeleton" if placeholder_type == "skeleton" else "unavailable"
+
+    html = f"""
+    <div class="w-full aspect-square bg-base-300 rounded-lg shadow-lg flex items-center justify-center {placeholder_class}">
+        <div class="text-center p-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+            </svg>
+            <p class="text-xs text-base-content/50 mt-2">{message}</p>
         </div>
     </div>
     """

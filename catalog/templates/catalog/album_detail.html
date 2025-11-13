@@ -41,13 +41,17 @@
                 </div>
                 {% endif %}
 
-                <!-- Genre -->
-                {% if album.genre %}
+                <!-- Genres -->
+                {% with genres=album.genres.all %}
+                {% if genres %}
                 <div class="metadata-item">
-                    <div class="metadata-label">Genre</div>
-                    <div class="metadata-value">{{ album.genre.name }}</div>
+                    <div class="metadata-label">Genre{% if genres|length > 1 %}s{% endif %}</div>
+                    <div class="metadata-value">
+                        {% for genre in genres %}{{ genre.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                    </div>
                 </div>
                 {% endif %}
+                {% endwith %}
 
                 <!-- Vocal Style -->
                 {% if album.vocal_style %}

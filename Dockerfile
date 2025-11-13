@@ -37,6 +37,9 @@ COPY pyproject.toml uv.lock ./
 # Install Python dependencies using uv
 RUN uv sync --frozen
 
+# Add venv to PATH so python/django commands work directly
+ENV PATH="/app/.venv/bin:$PATH"
+
 # Copy project files
 COPY . .
 
@@ -47,4 +50,4 @@ RUN mkdir -p /var/run/postgresql && chmod 777 /var/run/postgresql
 EXPOSE 8000
 
 # Run migrations and start development server
-CMD ["uv", "run", "python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

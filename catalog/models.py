@@ -119,7 +119,7 @@ class Album(models.Model):
         spotify_album_id: Spotify's unique album ID (extracted from URL)
         name: Album title
         artist: Foreign key to Artist model
-        genre: Foreign key to Genre model (optional)
+        genres: Many-to-many relationship to Genre model (supports multiple genres per album)
         vocal_style: Foreign key to VocalStyle model (optional)
         release_date: Official release date (can be partial: year or year-month)
         cover_art_url: Spotify CDN URL for album cover art
@@ -138,12 +138,11 @@ class Album(models.Model):
     artist = models.ForeignKey(
         Artist, on_delete=models.CASCADE, related_name="album_set"
     )
-    genre = models.ForeignKey(
+    genres = models.ManyToManyField(
         Genre,
-        on_delete=models.SET_NULL,
-        null=True,
         blank=True,
-        related_name="album_set",
+        related_name="albums",
+        help_text="Genres this album belongs to (supports multiple genres)",
     )
     vocal_style = models.ForeignKey(
         VocalStyle,
@@ -158,12 +157,37 @@ class Album(models.Model):
     imported_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Just-in-Time Spotify API cache fields
+    spotify_cover_url = models.URLField(
+        max_length=500,
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text="Cached Spotify cover art URL fetched on-demand",
+    )
+    spotify_cover_cached_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="Timestamp when cover art was cached",
+    )
+    spotify_metadata_json = models.JSONField(
+        blank=True,
+        null=True,
+        help_text="Cached detailed Spotify metadata (genres, tracks, popularity)",
+    )
+    spotify_metadata_cached_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="Timestamp when metadata was cached",
+    )
+
     class Meta:
         ordering = ["-release_date", "-imported_at"]
         indexes = [
             models.Index(fields=["spotify_album_id"]),
             models.Index(fields=["-release_date"]),
-            models.Index(fields=["artist", "genre", "vocal_style"]),
+            models.Index(fields=["artist", "vocal_style"]),
+            models.Index(fields=["spotify_cover_cached_at"]),
         ]
 
     def __str__(self):
@@ -245,6 +269,21 @@ class Album(models.Model):
         if self.release_date and self.release_date > timezone.now().date():
             # This is acceptable for pre-orders, just a note
             pass
+
+        # Validate cache field consistency (JIT Spotify API feature)
+        if self.spotify_cover_url and not self.spotify_cover_cached_at:
+            raise ValidationError(
+                {
+                    "spotify_cover_cached_at": "Must be set when cover URL is cached"
+                }
+            )
+
+        if self.spotify_metadata_json and not self.spotify_metadata_cached_at:
+            raise ValidationError(
+                {
+                    "spotify_metadata_cached_at": "Must be set when metadata is cached"
+                }
+            )
 
 
 class SyncRecord(models.Model):
@@ -330,6 +369,7 @@ class SyncOperation(models.Model):
         completed_at: When sync operation finished (success or failure)
         error_message: Error details if status is failed
         created_by_ip: IP address that triggered sync (for audit logging)
+        current_tab: Name of the currently processing Google Sheets tab (empty when not processing)
     """
 
     STATUS_CHOICES = [
@@ -337,6 +377,7 @@ class SyncOperation(models.Model):
         ("running", "Running"),
         ("completed", "Completed"),
         ("failed", "Failed"),
+        ("cancelled", "Cancelled"),
     ]
 
     STAGE_CHOICES = [
@@ -382,6 +423,12 @@ class SyncOperation(models.Model):
     )
     created_by_ip = models.GenericIPAddressField(
         null=True, blank=True, help_text="IP address that triggered sync"
+    )
+    current_tab = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Name of the currently processing Google Sheets tab",
     )
 
     class Meta:
@@ -429,6 +476,15 @@ class SyncOperation(models.Model):
 
         Returns:
             bool: True if status is pending or running
+        """
+        return self.status in ("pending", "running")
+
+    def is_cancellable(self) -> bool:
+        """
+        Return True if sync can be cancelled (pending or running).
+
+        Returns:
+            bool: True if status is pending or running (not completed, failed, or already cancelled)
         """
         return self.status in ("pending", "running")
 

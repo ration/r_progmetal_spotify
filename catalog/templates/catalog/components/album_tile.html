@@ -6,14 +6,20 @@
     href="{% url 'catalog:album-detail' album.pk %}"
     class="album-tile card bg-base-100 shadow-xl hover:shadow-2xl transition-all duration-300 cursor-pointer"
 >
-    <!-- Album Cover Image -->
-    <div class="album-cover">
-        <img
-            src="{{ album.get_cover_art_or_placeholder }}"
-            alt="{{ album.name }} by {{ album.artist.name }}"
-            loading="lazy"
-        />
-    </div>
+    <!-- Album Cover Image - JIT Loading -->
+    <figure
+        class="album-cover"
+        hx-get="{% url 'catalog:album-cover-art' album.id %}"
+        hx-trigger="intersect once"
+        hx-swap="innerHTML"
+    >
+        <!-- Skeleton placeholder while loading -->
+        <div class="w-full aspect-square bg-base-300 rounded-lg animate-pulse flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-base-content/20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+            </svg>
+        </div>
+    </figure>
 
     <!-- Album Information -->
     <div class="card-body p-4">
@@ -41,15 +47,17 @@
                 </span>
             </div>
 
-            <!-- Genre -->
+            <!-- Genres -->
             <div class="flex items-center gap-2">
                 <span class="text-base-content/60">🎵</span>
                 <span class="font-medium">
-                    {% if album.genre %}
-                        {{ album.genre.name }}
-                    {% else %}
-                        <span class="text-base-content/40">Unknown</span>
-                    {% endif %}
+                    {% with genres=album.genres.all %}
+                        {% if genres %}
+                            {% for genre in genres %}{{ genre.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                        {% else %}
+                            <span class="text-base-content/40">Unknown</span>
+                        {% endif %}
+                    {% endwith %}
                 </span>
             </div>
 

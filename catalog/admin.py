@@ -11,15 +11,21 @@ class AlbumAdmin(admin.ModelAdmin):
     list_display = [
         "name",
         "artist",
-        "genre",
+        "get_genres",
         "vocal_style",
         "release_date",
         "imported_at",
     ]
-    list_filter = ["genre", "vocal_style", "release_date"]
+    list_filter = ["genres", "vocal_style", "release_date"]
     search_fields = ["name", "artist__name"]
     readonly_fields = ["imported_at", "updated_at", "spotify_album_id"]
     date_hierarchy = "release_date"
+    filter_horizontal = ["genres"]
+
+    @admin.display(description="Genres")
+    def get_genres(self, obj):
+        """Display comma-separated list of genres for admin list view."""
+        return ", ".join(genre.name for genre in obj.genres.all())
 
 
 @admin.register(Artist)

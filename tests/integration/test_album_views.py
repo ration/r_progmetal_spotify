@@ -123,8 +123,14 @@ class TestAlbumListView:
         url = reverse("catalog:album-list")
 
         # Should use select_related to avoid N+1 queries
-        # Expected queries: 1 for albums + related (due to select_related)
-        with django_assert_num_queries(1):
+        # Expected queries:
+        # 1. COUNT for pagination (total albums)
+        # 2. Latest sync record
+        # 3. COUNT for total albums context
+        # 4. Genres for filter dropdown
+        # 5. VocalStyles for filter dropdown
+        # 6. Albums with select_related (artist, genre, vocal_style)
+        with django_assert_num_queries(6):
             response = client.get(url)
             # Access the albums in the template rendering
             albums = response.context["albums"]

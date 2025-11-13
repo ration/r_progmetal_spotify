@@ -7,13 +7,74 @@ spotipy library.
 
 import logging
 import re
-from typing import Dict, Optional
+import time
+from functools import wraps
+from typing import Dict, Optional, Callable, Any
 from datetime import datetime, date
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyClientCredentials
 from spotipy.exceptions import SpotifyException
 
 logger = logging.getLogger(__name__)
+
+
+def rate_limited(max_retries: int = 3) -> Callable:
+    """
+    Decorator for rate-limited Spotify API calls with exponential backoff.
+
+    Handles 429 (Too Many Requests) errors by retrying with exponential backoff.
+    Other errors are raised immediately.
+
+    Args:
+        max_retries: Maximum number of retry attempts (default: 3)
+
+    Returns:
+        Decorated function that handles rate limiting
+
+    Example:
+        @rate_limited(max_retries=3)
+        def fetch_data():
+            return spotify_client.album("abc123")
+    """
+
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+
+                except SpotifyException as e:
+                    if e.http_status == 429:
+                        # Rate limit hit - calculate backoff delay
+                        retry_after = int(e.headers.get("Retry-After", 1))
+                        backoff_delay = retry_after * (2**attempt)
+
+                        logger.warning(
+                            f"Spotify API rate limit hit (attempt {attempt + 1}/{max_retries}). "
+                            f"Retrying after {backoff_delay}s"
+                        )
+
+                        if attempt < max_retries - 1:
+                            time.sleep(backoff_delay)
+                        else:
+                            logger.error(
+                                f"Max retries ({max_retries}) exceeded for rate-limited request"
+                            )
+                            raise
+                    else:
+                        # Non-rate-limit error - raise immediately
+                        logger.error(
+                            f"Spotify API error (HTTP {e.http_status}): {e.msg}"
+                        )
+                        raise
+
+            # Should never reach here
+            raise Exception(f"Max retries exceeded for {func.__name__}")
+
+        return wrapper
+
+    return decorator
 
 
 class SpotifyClient:
@@ -42,7 +103,8 @@ class SpotifyClient:
             auth_manager = SpotifyClientCredentials(
                 client_id=client_id, client_secret=client_secret
             )
-            self.client = Spotify(auth_manager=auth_manager)
+            # Set timeout to 10 seconds to prevent hanging on slow API responses
+            self.client = Spotify(auth_manager=auth_manager, requests_timeout=10)
             logger.info("Successfully initialized Spotify client")
         except SpotifyException as e:
             logger.error(f"Failed to initialize Spotify client: {e}")
@@ -238,4 +300,158 @@ class SpotifyClient:
 
         except Exception as e:
             logger.error(f"Unexpected error fetching artist {artist_id}: {e}")
+            return None
+
+    @rate_limited(max_retries=3)
+    def fetch_album_cover(self, album_id: str) -> Optional[str]:
+        """
+        Fetch album cover art URL from Spotify API (just-in-time loading).
+
+        This method is specifically for on-demand cover art fetching during
+        catalog browsing. Uses rate limiting to handle API throttling gracefully.
+
+        Args:
+            album_id: Spotify album ID (22 characters)
+
+        Returns:
+            str: URL to album cover art (highest resolution available)
+            None: If album not found or has no cover art
+
+        Raises:
+            SpotifyException: If API request fails after max retries
+        """
+        try:
+            logger.debug(f"Fetching cover art for album ID: {album_id}")
+            album_data = self.client.album(album_id)
+
+            # Get highest resolution cover art
+            if album_data.get("images") and len(album_data["images"]) > 0:
+                # Images are sorted by size (largest first)
+                cover_url = album_data["images"][0]["url"]
+                logger.info(f"Successfully fetched cover art for album {album_id}")
+                return cover_url
+
+            logger.warning(f"Album {album_id} has no cover art")
+            return None
+
+        except SpotifyException as e:
+            if e.http_status == 404:
+                logger.warning(f"Album {album_id} not found on Spotify")
+                return None
+            # Rate limit errors already logged by decorator
+            if e.http_status != 429:
+                logger.error(
+                    f"Spotify API error fetching cover for album {album_id}: "
+                    f"HTTP {e.http_status} - {e.msg}"
+                )
+            raise
+
+        except Exception as e:
+            logger.error(
+                f"Unexpected error fetching cover for album {album_id}: {e}",
+                exc_info=True,
+            )
+            return None
+
+    @rate_limited(max_retries=3)
+    def fetch_album_metadata(self, album_id: str) -> Optional[Dict]:
+        """
+        Fetch detailed album metadata from Spotify API (just-in-time loading).
+
+        This method fetches comprehensive metadata including track listings, genres,
+        and popularity for display on album detail pages. Uses rate limiting to
+        handle API throttling gracefully.
+
+        Args:
+            album_id: Spotify album ID (22 characters)
+
+        Returns:
+            dict: Album metadata including:
+                - name: Album title
+                - artist: Primary artist name
+                - release_date: ISO 8601 date string
+                - total_tracks: Number of tracks
+                - popularity: Spotify popularity score (0-100)
+                - genres: List of genre strings (from artist data)
+                - tracks: List of track objects with name, duration_ms, explicit
+                - label: Record label name
+                - copyrights: List of copyright objects
+                - external_urls: Dict with Spotify URL
+
+            None: If album not found or API error occurs
+
+        Raises:
+            SpotifyException: If API request fails after max retries
+        """
+        try:
+            logger.debug(f"Fetching detailed metadata for album ID: {album_id}")
+            album_data = self.client.album(album_id)
+
+            # Extract primary artist
+            primary_artist = (
+                album_data["artists"][0] if album_data["artists"] else None
+            )
+            if not primary_artist:
+                logger.warning(f"Album {album_id} has no artists")
+                return None
+
+            # Fetch artist data for genres (albums don't have genre data)
+            artist_genres = []
+            try:
+                artist_data = self.client.artist(primary_artist["id"])
+                artist_genres = artist_data.get("genres", [])
+            except SpotifyException as e:
+                logger.warning(
+                    f"Could not fetch artist genres for {primary_artist['id']}: {e}"
+                )
+
+            # Extract track information
+            tracks = []
+            for track in album_data.get("tracks", {}).get("items", []):
+                tracks.append(
+                    {
+                        "track_number": track.get("track_number"),
+                        "name": track.get("name"),
+                        "duration_ms": track.get("duration_ms"),
+                        "explicit": track.get("explicit", False),
+                    }
+                )
+
+            # Build metadata dictionary
+            metadata = {
+                "name": album_data["name"],
+                "artist": primary_artist["name"],
+                "release_date": album_data.get("release_date", ""),
+                "total_tracks": album_data.get("total_tracks", 0),
+                "popularity": album_data.get("popularity", 0),
+                "genres": artist_genres,
+                "tracks": tracks,
+                "label": album_data.get("label", ""),
+                "copyrights": album_data.get("copyrights", []),
+                "external_urls": album_data.get("external_urls", {}),
+            }
+
+            logger.info(
+                f"Successfully fetched detailed metadata for '{metadata['name']}' "
+                f"by {metadata['artist']}"
+            )
+            return metadata
+
+        except SpotifyException as e:
+            if e.http_status == 404:
+                logger.warning(f"Album {album_id} not found on Spotify")
+                return None
+            # Rate limit errors already logged by decorator
+            if e.http_status != 429:
+                logger.error(
+                    f"Spotify API error fetching metadata for album {album_id}: "
+                    f"HTTP {e.http_status} - {e.msg}"
+                )
+            raise
+
+        except Exception as e:
+            logger.error(
+                f"Unexpected error fetching metadata for album {album_id}: {e}",
+                exc_info=True,
+            )
             return None

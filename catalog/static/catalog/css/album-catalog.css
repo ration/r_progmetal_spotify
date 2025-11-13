@@ -80,7 +80,7 @@ body {
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
 }
 
-/* Album Cover Image - Firefox-compatible */
+/* Album Cover Image - Firefox-compatible with JIT loading support */
 .album-tile .album-cover {
     width: 100% !important;
     height: 0 !important;
@@ -92,6 +92,7 @@ body {
     display: block !important;
 }
 
+/* Image inside album cover (loaded via HTMX) */
 .album-tile .album-cover img {
     position: absolute !important;
     top: 0 !important;
@@ -107,6 +108,47 @@ body {
     margin: 0 !important;
     padding: 0 !important;
     border: none !important;
+}
+
+/* Skeleton placeholder (before JIT load) */
+.album-tile .album-cover > div {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Fade-in animation for loaded cover art */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.album-tile .album-cover img.fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Skeleton loading animation */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.album-tile .album-cover .animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 /* Album Info */

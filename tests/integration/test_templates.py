@@ -44,9 +44,9 @@ class TestResponsiveGridLayout:
         assert "Karnivool" in content
 
     def test_album_cover_image_lazy_loading(self, client):
-        """Test that album cover images use lazy loading attribute."""
+        """Test that album cover images use JIT loading with HTMX."""
         artist = Artist.objects.create(name="Caligula's Horse", country="Australia")
-        Album.objects.create(
+        album = Album.objects.create(
             spotify_album_id="A" * 22,
             name="In Contact",
             artist=artist,
@@ -59,8 +59,11 @@ class TestResponsiveGridLayout:
         response = client.get(url)
         content = response.content.decode()
 
-        # Check for lazy loading
-        assert 'loading="lazy"' in content
+        # Check for JIT loading with HTMX attributes
+        assert 'hx-get' in content
+        assert 'hx-trigger="intersect once"' in content
+        assert 'hx-swap="innerHTML"' in content
+        assert f'/catalog/album/{album.id}/cover-art/' in content
 
     def test_placeholder_image_fallback(self, client):
         """Test that albums without cover art show placeholder."""
