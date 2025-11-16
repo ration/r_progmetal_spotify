@@ -195,6 +195,42 @@ class AlbumDetailView(DetailView):
         return context
 
 
+def admin_sync_page(request: HttpRequest) -> HttpResponse:
+    """
+    Display the admin sync page with sync controls.
+
+    This view provides a dedicated administrative interface for managing
+    album synchronization operations. It displays the sync button, real-time
+    status updates, and the timestamp of the last successful sync.
+
+    Context:
+        latest_sync: SyncRecord | None - Most recent completed sync operation
+        page_title: str - Page title for the template
+
+    Args:
+        request: HTTP request object
+
+    Returns:
+        Rendered admin sync page template
+    """
+    from django.shortcuts import render
+
+    latest_sync: Optional[SyncRecord] = (
+        SyncRecord.objects.filter(success=True)
+        .order_by("-sync_timestamp")
+        .first()
+    )
+
+    return render(
+        request,
+        "catalog/admin_sync.html",
+        {
+            "latest_sync": latest_sync,
+            "page_title": "Sync Administration",
+        },
+    )
+
+
 @csrf_protect
 @require_http_methods(["POST"])
 def sync_trigger(request: HttpRequest) -> HttpResponse:

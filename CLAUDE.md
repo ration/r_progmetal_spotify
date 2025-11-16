@@ -157,7 +157,10 @@ python manage.py sync_spotify --all  # Re-sync all albums with Spotify
   - Per-tab album fetching with progress tracking
   - Tab-level error isolation and recovery
 - Python 3.14 + Django 5.2.8, django-htmx, spotipy (Spotify API client), psycopg (PostgreSQL adapter) (006-jit-spotify-api)
+- Python 3.14 + Django 5.2.8, django-htmx 1.16.0, Tailwind CSS v4 (CDN), DaisyUI v5 (007-admin-sync-page)
+- PostgreSQL (production/Docker), SQLite (development/tests) (007-admin-sync-page)
 
 ## Recent Changes
+- 007-admin-sync-page: Created dedicated admin page for sync controls, moved sync button/status/timestamp from main catalog to /catalog/admin/sync
 - 005-multi-tab-parsing: Added multi-tab Google Sheets parsing with openpyxl, tab filtering, chronological processing, and error isolation
 - 002-catalog-statistics: Added Python 3.14 + Django 5.2.8, django-htmx, psycopg (PostgreSQL adapter)

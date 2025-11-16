@@ -1,0 +1,77 @@
+{% extends "catalog/base.html" %}
+
+{% block title %}{{ page_title }} - Progressive Metal Catalog{% endblock %}
+
+{% block content %}
+<div class="w-full max-w-4xl mx-auto">
+    <!-- Page Header -->
+    <div class="mb-8">
+        <h1 class="text-4xl font-bold mb-2">{{ page_title }}</h1>
+        <p class="text-base-content/70">
+            Manage album synchronization with Google Sheets and Spotify API
+        </p>
+    </div>
+
+    <!-- Navigation back to catalog -->
+    <div class="mb-6">
+        <a href="{% url 'catalog:album-list' %}" class="btn btn-outline btn-sm">
+            ← Back to Catalog
+        </a>
+    </div>
+
+    <!-- Sync Button Component -->
+    {% include "catalog/components/sync_button.html" %}
+
+    <!-- Sync Status Component -->
+    {% include "catalog/components/sync_status.html" %}
+
+    <!-- Last Sync Timestamp -->
+    {% if latest_sync %}
+    <div class="mb-6 text-sm text-base-content/70">
+        Last synced: <span class="timeago" data-timestamp="{{ latest_sync.sync_timestamp.isoformat }}">{{ latest_sync.sync_timestamp|date:"Y-m-d H:i:s" }}</span>
+    </div>
+    {% else %}
+    <div class="mb-6 text-sm text-base-content/70">
+        Never synced
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Update relative timestamp display
+function updateTimeago() {
+    const timeagoElements = document.querySelectorAll('.timeago');
+
+    timeagoElements.forEach(element => {
+        const timestamp = element.getAttribute('data-timestamp');
+        if (!timestamp) return;
+
+        const date = new Date(timestamp);
+        const now = new Date();
+        const secondsAgo = Math.floor((now - date) / 1000);
+
+        let relativeTime;
+        if (secondsAgo < 60) {
+            relativeTime = 'just now';
+        } else if (secondsAgo < 3600) {
+            const minutes = Math.floor(secondsAgo / 60);
+            relativeTime = minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+        } else if (secondsAgo < 86400) {
+            const hours = Math.floor(secondsAgo / 3600);
+            relativeTime = hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+        } else {
+            const days = Math.floor(secondsAgo / 86400);
+            relativeTime = days === 1 ? '1 day ago' : `${days} days ago`;
+        }
+
+        element.textContent = relativeTime;
+    });
+}
+
+// Update on page load
+updateTimeago();
+
+// Update every minute (60000ms)
+setInterval(updateTimeago, 60000);
+</script>
+{% endblock %}
