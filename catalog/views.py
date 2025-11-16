@@ -24,8 +24,8 @@ class AlbumListView(ListView):
     """
     Display a list of albums in a responsive grid layout with pagination.
 
-    Albums are ordered by release date (newest first), with a secondary
-    sort by import date. Optimizes queries using select_related for
+    Albums are ordered by import date (newest added first), with a secondary
+    sort by release date. Optimizes queries using select_related for
     artist, genre, and vocal_style foreign keys.
 
     Pagination: Displays 50 albums per page by default, configurable via
@@ -116,7 +116,7 @@ class AlbumListView(ListView):
         if vocal_slug:
             queryset = queryset.filter(vocal_style__slug=vocal_slug)
 
-        return queryset.order_by("-release_date", "-imported_at")
+        return queryset.order_by("-imported_at", "-release_date")
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         """
