@@ -10,7 +10,6 @@ from __future__ import annotations
 import re
 import logging
 from typing import Optional
-from datetime import datetime
 
 from django.db import transaction
 from django.utils import timezone

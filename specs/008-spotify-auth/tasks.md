@@ -28,11 +28,11 @@ This is a Django web application. File paths are relative to repository root:
 
 **Purpose**: External setup and environment configuration before implementation
 
-- [ ] T001 Register application at Spotify Developer Dashboard (https://developer.spotify.com/dashboard)
-- [ ] T002 Configure Spotify redirect URIs (dev: http://localhost:9000/catalog/auth/callback/, prod: https://yourdomain.com/catalog/auth/callback/)
-- [ ] T003 Add environment variables to .env file (SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI)
-- [ ] T004 [P] Verify Python 3.14 and Django 5.2.8 environment is active
-- [ ] T005 [P] Add requests library to dependencies if not present (likely already included via spotipy)
+- [x] T001 Register application at Spotify Developer Dashboard (https://developer.spotify.com/dashboard)
+- [x] T002 Configure Spotify redirect URIs (dev: http://localhost:9000/catalog/auth/callback/, prod: https://yourdomain.com/catalog/auth/callback/)
+- [x] T003 Add environment variables to .env file (SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI)
+- [x] T004 [P] Verify Python 3.14 and Django 5.2.8 environment is active
+- [x] T005 [P] Add requests library to dependencies if not present (likely already included via spotipy)
 
 ---
 
@@ -42,24 +42,24 @@ This is a Django web application. File paths are relative to repository root:
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T006 Create User model in catalog/models.py with fields: spotify_user_id (unique), email, display_name, profile_picture_url, is_admin (boolean, default False), created_at, updated_at
-- [ ] T007 Add type annotations and docstring to User model following project standards
-- [ ] T008 Create SpotifyToken model in catalog/models.py with fields: user (OneToOneField), access_token, refresh_token, expires_at, created_at, updated_at
-- [ ] T009 Add expires_soon() method to SpotifyToken model (returns True if expires_at < now + 5 minutes)
-- [ ] T010 Add refresh() method to SpotifyToken model to update tokens atomically
-- [ ] T011 Add type annotations and docstring to SpotifyToken model following project standards
-- [ ] T012 Create and run migrations: python manage.py makemigrations catalog
-- [ ] T013 Apply migrations: python manage.py migrate catalog
-- [ ] T014 Create catalog/services/ directory if it doesn't exist
-- [ ] T015 Create SpotifyAuthService class in catalog/services/spotify_auth.py with OAuth utility methods
-- [ ] T016 Implement generate_auth_url() method in SpotifyAuthService
-- [ ] T017 Implement exchange_code_for_tokens() method in SpotifyAuthService
-- [ ] T018 Implement fetch_user_profile() method in SpotifyAuthService
-- [ ] T019 Implement refresh_access_token() method in SpotifyAuthService
-- [ ] T020 Implement create_or_update_user() method in SpotifyAuthService (includes first-user-is-admin logic)
-- [ ] T021 Add type annotations and docstrings to all SpotifyAuthService methods
-- [ ] T022 Create RefreshTokenExpiredError exception class in catalog/services/spotify_auth.py
-- [ ] T023 Create global spotify_auth_service instance in catalog/services/spotify_auth.py
+- [x] T006 Create User model in catalog/models.py with fields: spotify_user_id (unique), email, display_name, profile_picture_url, is_admin (boolean, default False), created_at, updated_at
+- [x] T007 Add type annotations and docstring to User model following project standards
+- [x] T008 Create SpotifyToken model in catalog/models.py with fields: user (OneToOneField), access_token, refresh_token, expires_at, created_at, updated_at
+- [x] T009 Add expires_soon() method to SpotifyToken model (returns True if expires_at < now + 5 minutes)
+- [x] T010 Add refresh() method to SpotifyToken model to update tokens atomically
+- [x] T011 Add type annotations and docstring to SpotifyToken model following project standards
+- [x] T012 Create and run migrations: python manage.py makemigrations catalog
+- [x] T013 Apply migrations: python manage.py migrate catalog
+- [x] T014 Create catalog/services/ directory if it doesn't exist
+- [x] T015 Create SpotifyAuthService class in catalog/services/spotify_auth.py with OAuth utility methods
+- [x] T016 Implement generate_auth_url() method in SpotifyAuthService
+- [x] T017 Implement exchange_code_for_tokens() method in SpotifyAuthService
+- [x] T018 Implement fetch_user_profile() method in SpotifyAuthService
+- [x] T019 Implement refresh_access_token() method in SpotifyAuthService
+- [x] T020 Implement create_or_update_user() method in SpotifyAuthService (includes first-user-is-admin logic)
+- [x] T021 Add type annotations and docstrings to all SpotifyAuthService methods
+- [x] T022 Create RefreshTokenExpiredError exception class in catalog/services/spotify_auth.py
+- [x] T023 Create global spotify_auth_service instance in catalog/services/spotify_auth.py
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -88,19 +88,19 @@ This is a Django web application. File paths are relative to repository root:
 
 ### Implementation for User Story 1
 
-- [ ] T034 [P] [US1] Create login template at catalog/templates/catalog/login.html with "Login with Spotify" button
-- [ ] T035 [P] [US1] Add login_page view in catalog/views.py to render login template
-- [ ] T036 [US1] Add spotify_oauth_initiate view in catalog/views.py to generate state, store in session, redirect to Spotify
-- [ ] T037 [US1] Add spotify_oauth_callback view in catalog/views.py to handle OAuth callback, validate state, exchange code for tokens, create/update user, set session
-- [ ] T038 [US1] Add logout_view in catalog/views.py to clear session and redirect to login (@require_http_methods(["POST"]))
-- [ ] T039 [US1] Add type annotations and docstrings to all new views following project standards
-- [ ] T040 [US1] Add URL patterns to catalog/urls.py: auth/login/, auth/spotify/, auth/callback/, auth/logout/
-- [ ] T041 [US1] Create catalog/middleware.py file
-- [ ] T042 [US1] Implement AuthenticationMiddleware in catalog/middleware.py to load user from session
-- [ ] T043 [US1] Add route protection logic to AuthenticationMiddleware (redirect unauthenticated users to login for non-public paths)
-- [ ] T044 [US1] Add type annotations and docstrings to AuthenticationMiddleware
-- [ ] T045 [US1] Register AuthenticationMiddleware in config/settings.py MIDDLEWARE list (after SessionMiddleware)
-- [ ] T046 [US1] Update catalog/templates/catalog/base.html navigation to show login link when logged out
+- [x] T034 [P] [US1] Create login template at catalog/templates/catalog/login.html with "Login with Spotify" button
+- [x] T035 [P] [US1] Add login_page view in catalog/views.py to render login template
+- [x] T036 [US1] Add spotify_oauth_initiate view in catalog/views.py to generate state, store in session, redirect to Spotify
+- [x] T037 [US1] Add spotify_oauth_callback view in catalog/views.py to handle OAuth callback, validate state, exchange code for tokens, create/update user, set session
+- [x] T038 [US1] Add logout_view in catalog/views.py to clear session and redirect to login (@require_http_methods(["POST"]))
+- [x] T039 [US1] Add type annotations and docstrings to all new views following project standards
+- [x] T040 [US1] Add URL patterns to catalog/urls.py: auth/login/, auth/spotify/, auth/callback/, auth/logout/
+- [x] T041 [US1] Create catalog/middleware.py file
+- [x] T042 [US1] Implement AuthenticationMiddleware in catalog/middleware.py to load user from session
+- [x] T043 [US1] Add route protection logic to AuthenticationMiddleware (redirect unauthenticated users to login for non-public paths)
+- [x] T044 [US1] Add type annotations and docstrings to AuthenticationMiddleware
+- [x] T045 [US1] Register AuthenticationMiddleware in config/settings.py MIDDLEWARE list (after SessionMiddleware)
+- [x] T046 [US1] Update catalog/templates/catalog/base.html navigation to show login link when logged out
 - [ ] T047 [US1] Run contract tests and verify they pass: pytest tests/contract/test_spotify_oauth_flow.py
 - [ ] T048 [US1] Run integration tests and verify they pass: pytest tests/integration/test_user_authentication.py
 - [ ] T049 [US1] Manual test: Navigate to /catalog/auth/login/ and verify page renders
@@ -129,12 +129,12 @@ This is a Django web application. File paths are relative to repository root:
 
 ### Implementation for User Story 2
 
-- [ ] T059 [P] [US2] Create profile template at catalog/templates/catalog/profile.html to display user's Spotify info (display name, email, profile picture, is_admin badge)
-- [ ] T060 [US2] Add profile_page view in catalog/views.py to render profile template (requires authentication)
-- [ ] T061 [US2] Add type annotations and docstring to profile_page view
-- [ ] T062 [US2] Add URL pattern to catalog/urls.py: auth/profile/
-- [ ] T063 [US2] Update catalog/templates/catalog/base.html navigation to show user dropdown with display name, profile picture, and "Profile" link
-- [ ] T064 [US2] Add "Admin" link to dropdown if user.is_admin is True
+- [x] T059 [P] [US2] Create profile template at catalog/templates/catalog/profile.html to display user's Spotify info (display name, email, profile picture, is_admin badge)
+- [x] T060 [US2] Add profile_page view in catalog/views.py to render profile template (requires authentication)
+- [x] T061 [US2] Add type annotations and docstring to profile_page view
+- [x] T062 [US2] Add URL pattern to catalog/urls.py: auth/profile/
+- [x] T063 [US2] Update catalog/templates/catalog/base.html navigation to show user dropdown with display name, profile picture, and "Profile" link
+- [x] T064 [US2] Add "Admin" link to dropdown if user.is_admin is True
 - [ ] T065 [US2] Run contract tests and verify they pass: pytest tests/contract/test_spotify_oauth_flow.py
 - [ ] T066 [US2] Run integration tests and verify they pass: pytest tests/integration/test_user_authentication.py
 - [ ] T067 [US2] Manual test: Navigate to /catalog/auth/profile/ and verify profile displays correctly
@@ -160,10 +160,10 @@ This is a Django web application. File paths are relative to repository root:
 
 ### Implementation for User Story 3
 
-- [ ] T074 [US3] Add disconnect_spotify view in catalog/views.py to delete SpotifyToken and flush session (@require_http_methods(["POST"]))
-- [ ] T075 [US3] Add type annotations and docstring to disconnect_spotify view
-- [ ] T076 [US3] Add URL pattern to catalog/urls.py: auth/disconnect/
-- [ ] T077 [US3] Add "Disconnect Spotify" button to profile template (catalog/templates/catalog/profile.html) with POST form
+- [x] T074 [US3] Add disconnect_spotify view in catalog/views.py to delete SpotifyToken and flush session (@require_http_methods(["POST"]))
+- [x] T075 [US3] Add type annotations and docstring to disconnect_spotify view
+- [x] T076 [US3] Add URL pattern to catalog/urls.py: auth/disconnect/
+- [x] T077 [US3] Add "Disconnect Spotify" button to profile template (catalog/templates/catalog/profile.html) with POST form
 - [ ] T078 [US3] Run contract tests and verify they pass: pytest tests/contract/test_spotify_oauth_flow.py
 - [ ] T079 [US3] Run integration tests and verify they pass: pytest tests/integration/test_user_authentication.py
 - [ ] T080 [US3] Manual test: Click "Disconnect Spotify" on profile page and verify logout
@@ -191,11 +191,11 @@ This is a Django web application. File paths are relative to repository root:
 
 ### Implementation for User Story 4
 
-- [ ] T089 [US4] Implement TokenRefreshMiddleware in catalog/middleware.py to check token expiry on each request
-- [ ] T090 [US4] Add logic to TokenRefreshMiddleware to call SpotifyAuthService.refresh_access_token() if token expires soon
-- [ ] T091 [US4] Add error handling for RefreshTokenExpiredError in TokenRefreshMiddleware (delete token, logout user, redirect to login)
-- [ ] T092 [US4] Add type annotations and docstrings to TokenRefreshMiddleware
-- [ ] T093 [US4] Register TokenRefreshMiddleware in config/settings.py MIDDLEWARE list (after AuthenticationMiddleware)
+- [x] T089 [US4] Implement TokenRefreshMiddleware in catalog/middleware.py to check token expiry on each request
+- [x] T090 [US4] Add logic to TokenRefreshMiddleware to call SpotifyAuthService.refresh_access_token() if token expires soon
+- [x] T091 [US4] Add error handling for RefreshTokenExpiredError in TokenRefreshMiddleware (delete token, logout user, redirect to login)
+- [x] T092 [US4] Add type annotations and docstrings to TokenRefreshMiddleware
+- [x] T093 [US4] Register TokenRefreshMiddleware in config/settings.py MIDDLEWARE list (after AuthenticationMiddleware)
 - [ ] T094 [US4] Run unit tests and verify they pass: pytest tests/unit/test_spotify_auth_service.py
 - [ ] T095 [US4] Run integration tests and verify they pass: pytest tests/integration/test_user_authentication.py
 - [ ] T096 [US4] Manual test: Login, manually set token expires_at to past time in database, make request, verify token refreshed

@@ -2,20 +2,23 @@
 
 import logging
 import os
+import secrets
 from typing import Any, Optional
 
 from django.db import transaction
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest, HttpResponse, JsonResponse, Http404
+from django.shortcuts import render, redirect
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
 from django.views.generic import ListView, DetailView
 from spotipy.exceptions import SpotifyException
 
-from catalog.models import Album, Genre, VocalStyle, SyncOperation, SyncRecord
+from catalog.models import Album, Genre, VocalStyle, SyncOperation, SyncRecord, SpotifyToken
 from catalog.services.sync_manager import SyncManager
 from catalog.services.album_cache import get_cached_cover_url, cache_cover_url
 from catalog.services.spotify_client import SpotifyClient
+from catalog.services.spotify_auth import spotify_auth_service
 
 logger = logging.getLogger(__name__)
 
@@ -778,3 +781,166 @@ def _render_cover_placeholder(
     """
 
     return HttpResponse(html, content_type="text/html")
+
+
+# ============================================================================
+# Authentication Views
+# ============================================================================
+
+
+def login_page(request: HttpRequest) -> HttpResponse:
+    """
+    Display login page with 'Login with Spotify' button.
+
+    Args:
+        request: HTTP request object
+
+    Returns:
+        HttpResponse: Rendered login page
+
+    Query parameters:
+        next: URL to redirect after successful login (default: /catalog/)
+    """
+    next_url = request.GET.get('next', '/catalog/')
+    return render(request, 'catalog/login.html', {'next_url': next_url})
+
+
+def spotify_oauth_initiate(request: HttpRequest) -> HttpResponse:
+    """
+    Initiate Spotify OAuth flow.
+
+    Generates OAuth state for CSRF protection, stores it in session along with
+    the next URL, then redirects to Spotify authorization page.
+
+    Args:
+        request: HTTP request object
+
+    Returns:
+        HttpResponse: Redirect to Spotify authorization page
+
+    Query parameters:
+        next: URL to redirect after successful login (stored in session)
+    """
+    # Generate and store OAuth state
+    state = secrets.token_urlsafe(32)
+    request.session['oauth_state'] = state
+
+    # Store next URL for post-login redirect
+    next_url = request.GET.get('next', '/catalog/')
+    request.session['next_url'] = next_url
+
+    # Redirect to Spotify authorization
+    auth_url = spotify_auth_service.generate_auth_url(state)
+    return redirect(auth_url)
+
+
+def spotify_oauth_callback(request: HttpRequest) -> HttpResponse:
+    """
+    Handle Spotify OAuth callback.
+
+    Validates OAuth state parameter, exchanges authorization code for tokens,
+    creates or updates user, and sets up user session.
+
+    Args:
+        request: HTTP request object
+
+    Returns:
+        HttpResponse: Redirect to next URL on success, or error page/redirect on failure
+
+    Query parameters:
+        code: Authorization code from Spotify (on success)
+        state: OAuth state parameter (must match session state)
+        error: Error code if user denied authorization
+    """
+    # Handle user denial
+    if 'error' in request.GET:
+        error = request.GET.get('error')
+        return redirect(f'/catalog/auth/login/?error={error}')
+
+    # Validate OAuth state (CSRF protection)
+    state = request.GET.get('state')
+    session_state = request.session.get('oauth_state')
+    if not state or state != session_state:
+        return HttpResponse('Invalid OAuth state parameter', status=400)
+
+    # Exchange code for tokens
+    code = request.GET.get('code')
+    if not code:
+        return HttpResponse('Missing authorization code', status=400)
+
+    try:
+        tokens = spotify_auth_service.exchange_code_for_tokens(code)
+        profile = spotify_auth_service.fetch_user_profile(tokens['access_token'])
+        user = spotify_auth_service.create_or_update_user(profile, tokens)
+
+        # Set user session
+        request.session['user_id'] = user.id  # type: ignore[attr-defined]
+        del request.session['oauth_state']
+
+        # Redirect to next URL
+        next_url = request.session.pop('next_url', '/catalog/')
+        return redirect(next_url)
+
+    except Exception as e:
+        return HttpResponse(f'OAuth error: {str(e)}', status=500)
+
+
+@require_http_methods(["POST"])
+def logout_view(request: HttpRequest) -> HttpResponse:
+    """
+    Log out user and clear session.
+
+    Args:
+        request: HTTP request object
+
+    Returns:
+        HttpResponse: Redirect to login page
+
+    Requires CSRF token in POST request.
+    """
+    request.session.flush()
+    return redirect('/catalog/auth/login/')
+
+
+def profile_page(request: HttpRequest) -> HttpResponse:
+    """
+    Display user profile page.
+
+    Shows Spotify profile information including display name, email,
+    profile picture, and admin status.
+
+    Args:
+        request: HTTP request object
+
+    Returns:
+        HttpResponse: Rendered profile page or redirect to login if not authenticated
+    """
+    if not hasattr(request, 'user') or request.user is None:
+        return redirect('/catalog/auth/login/?next=/catalog/auth/profile/')
+
+    return render(request, 'catalog/profile.html', {
+        'user': request.user,
+        'is_admin': request.user.is_admin,  # type: ignore[attr-defined]
+    })
+
+
+@require_http_methods(["POST"])
+def disconnect_spotify(request: HttpRequest) -> HttpResponse:
+    """
+    Disconnect Spotify account and delete tokens.
+
+    Removes the user's SpotifyToken and ends their session.
+
+    Args:
+        request: HTTP request object
+
+    Returns:
+        HttpResponse: Redirect to login page with disconnected message
+
+    Requires CSRF token in POST request.
+    """
+    if hasattr(request, 'user') and request.user:
+        SpotifyToken.objects.filter(user=request.user).delete()
+
+    request.session.flush()
+    return redirect('/catalog/auth/login/?disconnected=true')

@@ -14,4 +14,11 @@ urlpatterns = [
     path("sync/stop/", views.sync_stop, name="sync-stop"),
     path("sync/button/", views.sync_button, name="sync-button"),
     path("sync/status/", views.sync_status, name="sync-status"),
+    # Authentication
+    path("auth/login/", views.login_page, name="login"),
+    path("auth/spotify/", views.spotify_oauth_initiate, name="oauth-initiate"),
+    path("auth/callback/", views.spotify_oauth_callback, name="oauth-callback"),
+    path("auth/logout/", views.logout_view, name="logout"),
+    path("auth/profile/", views.profile_page, name="profile"),
+    path("auth/disconnect/", views.disconnect_spotify, name="disconnect"),
 ]

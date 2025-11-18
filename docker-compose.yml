@@ -23,11 +23,12 @@ services:
   web:
     build: .
     container_name: progmetal_web
+    user: "1000:1001"  # Run as non-root user matching host user
     volumes:
       - .:/app
       - /app/.venv  # Exclude .venv from the volume mount to preserve installed packages
     ports:
-      - "8000:8000"
+      - "9000:8000"
     environment:
       - DATABASE_URL=postgresql://progmetal:progmetal_dev_password@db:5432/progmetal
       - DJANGO_SETTINGS_MODULE=config.settings

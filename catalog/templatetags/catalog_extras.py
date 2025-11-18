@@ -2,7 +2,6 @@
 Custom template tags and filters for catalog app.
 """
 from django import template
-from django.http import QueryDict
 
 register = template.Library()
 

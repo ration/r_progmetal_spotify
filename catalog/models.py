@@ -499,3 +499,116 @@ class SyncOperation(models.Model):
             return self.stage_message
         # Note: get_status_display is a Django-added method for choice fields
         return f"Status: {getattr(self, 'get_status_display', lambda: self.status)()}"
+
+
+class User(models.Model):
+    """
+    User authenticated via Spotify OAuth.
+
+    Stores Spotify profile information and application-specific attributes
+    like admin status. Users are created on first login via OAuth.
+
+    Attributes:
+        spotify_user_id: Spotify's unique user ID (from OAuth profile)
+        email: User's email address (from Spotify profile)
+        display_name: User's display name (from Spotify profile)
+        profile_picture_url: URL to user's Spotify profile picture (optional)
+        is_admin: Administrator flag for application access control
+        created_at: Timestamp of first login (user creation)
+        updated_at: Timestamp of last profile update
+    """
+
+    spotify_user_id = models.CharField(
+        max_length=255,
+        unique=True,
+        db_index=True,
+        help_text="Spotify's unique user ID"
+    )
+    email = models.EmailField(max_length=255, db_index=True)
+    display_name = models.CharField(max_length=255)
+    profile_picture_url = models.URLField(
+        max_length=500,
+        null=True,
+        blank=True,
+        help_text="URL to Spotify profile picture"
+    )
+    is_admin = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Administrator flag for application access control"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'catalog_user'
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        """Return string representation of user."""
+        return f"{self.display_name} ({self.email})"
+
+
+class SpotifyToken(models.Model):
+    """
+    Stores Spotify OAuth access and refresh tokens for authenticated users.
+
+    Separated from User model for security, token lifecycle management,
+    and to support potential future multi-token scenarios.
+
+    Attributes:
+        user: One-to-one relationship with User
+        access_token: Spotify OAuth access token (short-lived, ~1 hour)
+        refresh_token: Spotify OAuth refresh token (long-lived, no expiry)
+        expires_at: Timestamp when access_token expires
+        created_at: Timestamp of initial token issuance
+        updated_at: Timestamp of last token refresh
+    """
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='spotify_token'
+    )
+    access_token = models.CharField(max_length=500)
+    refresh_token = models.CharField(max_length=500)
+    expires_at = models.DateTimeField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'catalog_spotify_token'
+
+    def __str__(self) -> str:
+        """Return string representation of token."""
+        return f"Token for {self.user.display_name}"
+
+    def expires_soon(self) -> bool:
+        """
+        Returns True if token expires within 5 minutes.
+
+        Returns:
+            bool: True if expires_at < now + 5 minutes
+        """
+        return timezone.now() + timedelta(minutes=5) >= self.expires_at
+
+    def refresh(
+        self,
+        new_access_token: str,
+        new_refresh_token: str,
+        expires_in: int
+    ) -> None:
+        """
+        Update token with refreshed values from Spotify.
+
+        Args:
+            new_access_token: New Spotify access token
+            new_refresh_token: New Spotify refresh token
+            expires_in: Seconds until new access token expires
+
+        Updates access_token, refresh_token, and expires_at atomically.
+        """
+        self.access_token = new_access_token
+        self.refresh_token = new_refresh_token
+        self.expires_at = timezone.now() + timedelta(seconds=expires_in)
+        self.save()
