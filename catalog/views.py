@@ -175,9 +175,9 @@ class AlbumDetailView(DetailView):
         Return optimized queryset with related objects pre-fetched.
 
         Returns:
-            QuerySet[Album]: Albums with artist, genre, and vocal_style pre-loaded
+            QuerySet[Album]: Albums with artist, genres, and vocal_style pre-loaded
         """
-        return Album.objects.select_related("artist", "genre", "vocal_style")
+        return Album.objects.select_related("artist", "vocal_style").prefetch_related("genres")
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         """
