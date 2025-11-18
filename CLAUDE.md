@@ -159,6 +159,7 @@ python manage.py sync_spotify --all  # Re-sync all albums with Spotify
 - Python 3.14 + Django 5.2.8, django-htmx, spotipy (Spotify API client), psycopg (PostgreSQL adapter) (006-jit-spotify-api)
 - Python 3.14 + Django 5.2.8, django-htmx 1.16.0, Tailwind CSS v4 (CDN), DaisyUI v5 (007-admin-sync-page)
 - PostgreSQL (production/Docker), SQLite (development/tests) (007-admin-sync-page)
+- Python 3.14 + Django 5.2.8, django-allauth (for OAuth), spotipy (Spotify API client), psycopg (PostgreSQL adapter) (008-spotify-auth)
 
 ## Recent Changes
 - 007-admin-sync-page: Created dedicated admin page for sync controls, moved sync button/status/timestamp from main catalog to /catalog/admin/sync
