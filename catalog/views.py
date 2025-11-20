@@ -90,12 +90,15 @@ class AlbumListView(ListView):
         Supports:
         - ?q=<search> - Free-text search (min 3 chars) across album name,
                         artist name, genre names, vocal style name
-        - ?genre=<slug> - Filter by genre slug (matches any genre for albums with multiple genres)
-        - ?vocal=<slug> - Filter by vocal style slug
+        - ?genre=<slug> - Filter by genre slug (matches any album with any of these genres)
+                          Multiple genres can be specified (e.g., ?genre=djent&genre=prog-rock)
+        - ?vocal=<slug> - Filter by vocal style slug (matches any album with any of these styles)
+                          Multiple vocal styles can be specified
+        - ?sort=<field> - Sort by field (imported_at, -imported_at, release_date, -release_date)
 
         Returns:
             QuerySet[Album]: Albums with related artist, vocal_style, and genres
-                pre-fetched, ordered by release_date DESC, then imported_at DESC
+                pre-fetched, ordered by specified sort or default
         """
         queryset = Album.objects.select_related("artist", "vocal_style").prefetch_related("genres")
 
@@ -109,17 +112,45 @@ class AlbumListView(ListView):
                 | Q(vocal_style__name__icontains=search_query)
             ).distinct()
 
-        # Filter by genre if provided (matches any album with this genre)
-        genre_slug = self.request.GET.get("genre")
-        if genre_slug:
-            queryset = queryset.filter(genres__slug=genre_slug)
+        # Filter by genres if provided (matches albums with any of the selected genres)
+        genre_slugs = self.request.GET.getlist("genre")
+        if genre_slugs:
+            # Get Genre objects for the requested slugs
+            requested_genres = Genre.objects.filter(slug__in=genre_slugs)
 
-        # Filter by vocal style if provided
-        vocal_slug = self.request.GET.get("vocal")
-        if vocal_slug:
-            queryset = queryset.filter(vocal_style__slug=vocal_slug)
+            # Resolve aliases to their canonical genres
+            effective_genre_ids = []
+            for genre in requested_genres:
+                effective_genre = genre.get_effective_genre()
+                if not effective_genre.is_ignored:
+                    effective_genre_ids.append(effective_genre.id)
 
-        return queryset.order_by("-imported_at", "-release_date")
+            if effective_genre_ids:
+                queryset = queryset.filter(genres__id__in=effective_genre_ids).distinct()
+
+        # Filter by vocal styles if provided (matches albums with any of the selected styles)
+        vocal_slugs = self.request.GET.getlist("vocal")
+        if vocal_slugs:
+            queryset = queryset.filter(vocal_style__slug__in=vocal_slugs)
+
+        # Apply sorting
+        sort_field = self.request.GET.get("sort", "-imported_at")
+        # Validate sort field against allowed values
+        allowed_sorts = ["imported_at", "-imported_at", "release_date", "-release_date"]
+        if sort_field in allowed_sorts:
+            # Primary sort by selected field
+            if sort_field.startswith("-"):
+                # Descending order (e.g., -imported_at means newest first)
+                secondary_field = "-release_date" if "imported" in sort_field else "-imported_at"
+            else:
+                # Ascending order (e.g., imported_at means oldest first)
+                secondary_field = "release_date" if "imported" in sort_field else "imported_at"
+            queryset = queryset.order_by(sort_field, secondary_field)
+        else:
+            # Default sorting
+            queryset = queryset.order_by("-imported_at", "-release_date")
+
+        return queryset
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         """
@@ -143,14 +174,19 @@ class AlbumListView(ListView):
         context["has_search"] = bool(search_query and len(search_query) >= 3)
 
         # Add available genres and vocal styles for filters
-        context["genres"] = Genre.objects.all().order_by("name")
+        # Only show genres that are not ignored and not aliases
+        context["genres"] = Genre.objects.filter(
+            is_ignored=False,
+            canonical_genre__isnull=True
+        ).order_by("name")
         context["vocal_styles"] = VocalStyle.objects.all().order_by("name")
 
         # Track active filters
-        context["active_genre"] = self.request.GET.get("genre", "")
-        context["active_vocal"] = self.request.GET.get("vocal", "")
+        context["active_genres"] = self.request.GET.getlist("genre")
+        context["active_vocals"] = self.request.GET.getlist("vocal")
+        context["active_sort"] = self.request.GET.get("sort", "-imported_at")
         context["has_active_filters"] = bool(
-            context["active_genre"] or context["active_vocal"]
+            context["active_genres"] or context["active_vocals"]
         )
 
         # Add synchronization statistics
@@ -873,15 +909,23 @@ def spotify_oauth_callback(request: HttpRequest) -> HttpResponse:
         profile = spotify_auth_service.fetch_user_profile(tokens['access_token'])
         user = spotify_auth_service.create_or_update_user(profile, tokens)
 
-        # Set user session
+        # Clear any existing session data
+        request.session.flush()
+
+        # Create new session with user_id
         request.session['user_id'] = user.id  # type: ignore[attr-defined]
-        del request.session['oauth_state']
+        request.session.create()
+
+        # Get next URL (use default since session was flushed)
+        next_url = '/catalog/'
+
+        logger.info(f"User {user.display_name} logged in successfully, redirecting to {next_url}")
 
         # Redirect to next URL
-        next_url = request.session.pop('next_url', '/catalog/')
         return redirect(next_url)
 
     except Exception as e:
+        logger.error(f"OAuth callback error: {str(e)}", exc_info=True)
         return HttpResponse(f'OAuth error: {str(e)}', status=500)
 
 

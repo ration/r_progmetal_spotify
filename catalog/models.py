@@ -57,16 +57,35 @@ class Genre(models.Model):
     Attributes:
         name: Human-readable genre name (e.g., "Progressive Metal")
         slug: URL-safe identifier (e.g., "progressive-metal")
+        is_ignored: If True, genre is hidden from filters and UI
+        canonical_genre: If set, this genre is an alias/duplicate of the canonical genre
     """
 
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True, db_index=True)
+    is_ignored = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Hide this genre from filters and UI"
+    )
+    canonical_genre = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='aliases',
+        help_text="If this is a duplicate/alias, select the canonical genre to use instead"
+    )
 
     class Meta:
         ordering = ["name"]
 
     def __str__(self):
         """Return genre name."""
+        if self.canonical_genre:
+            return f"{self.name} → {self.canonical_genre.name}"
+        elif self.is_ignored:
+            return f"{self.name} (ignored)"
         return self.name
 
     def save(self, *args, **kwargs):
@@ -75,9 +94,35 @@ class Genre(models.Model):
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
+    def clean(self):
+        """Validate model fields."""
+        super().clean()
+
+        # Prevent self-reference
+        if self.canonical_genre == self:
+            raise ValidationError(
+                {"canonical_genre": "A genre cannot be its own canonical genre."}
+            )
+
+        # Prevent circular references
+        if self.canonical_genre:
+            if self.canonical_genre.canonical_genre:
+                raise ValidationError(
+                    {"canonical_genre": "Cannot reference a genre that is itself an alias. Choose the canonical genre directly."}
+                )
+
+    def get_effective_genre(self) -> 'Genre':
+        """
+        Return the canonical genre if this is an alias, otherwise return self.
+
+        Returns:
+            Genre: The canonical genre to use for filtering and display
+        """
+        return self.canonical_genre if self.canonical_genre else self
+
     def get_albums_count(self) -> int:
         """Return count of albums in this genre."""
-        return self.album_set.count()  # type: ignore[attr-defined]
+        return self.albums.count()  # type: ignore[attr-defined]
 
 
 class VocalStyle(models.Model):
@@ -547,6 +592,11 @@ class User(models.Model):
     def __str__(self) -> str:
         """Return string representation of user."""
         return f"{self.display_name} ({self.email})"
+
+    @property
+    def is_authenticated(self) -> bool:
+        """Always return True for authenticated custom User objects."""
+        return True
 
 
 class SpotifyToken(models.Model):

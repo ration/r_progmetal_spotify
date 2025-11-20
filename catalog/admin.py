@@ -41,9 +41,52 @@ class ArtistAdmin(admin.ModelAdmin):
 class GenreAdmin(admin.ModelAdmin):
     """Admin interface for Genre model."""
 
-    list_display = ["name", "slug"]
+    list_display = ["name", "slug", "is_ignored", "canonical_genre", "get_albums_count", "get_alias_count"]
+    list_filter = ["is_ignored"]
     search_fields = ["name"]
     prepopulated_fields = {"slug": ["name"]}
+    list_editable = ["is_ignored", "canonical_genre"]
+    ordering = ["name"]
+
+    fieldsets = [
+        ("Basic Information", {
+            "fields": ["name", "slug"]
+        }),
+        ("Genre Management", {
+            "fields": ["is_ignored", "canonical_genre"],
+            "description": (
+                "Mark duplicates/aliases by setting 'canonical genre'. "
+                "Mark unwanted genres as 'ignored' to hide from filters."
+            )
+        }),
+    ]
+
+    @admin.display(description="Albums")
+    def get_albums_count(self, obj):
+        """Display count of albums with this genre."""
+        count = obj.get_albums_count()
+        return f"{count} album{'s' if count != 1 else ''}"
+
+    @admin.display(description="Aliases")
+    def get_alias_count(self, obj):
+        """Display count of genres that use this as canonical."""
+        count = obj.aliases.count()
+        if count > 0:
+            alias_names = ", ".join(a.name for a in obj.aliases.all()[:3])
+            if count > 3:
+                alias_names += f" (+{count - 3} more)"
+            return f"{count}: {alias_names}"
+        return "—"
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Customize canonical_genre dropdown to exclude ignored genres and aliases."""
+        if db_field.name == "canonical_genre":
+            # Only show genres that are not ignored and not themselves aliases
+            kwargs["queryset"] = Genre.objects.filter(
+                is_ignored=False,
+                canonical_genre__isnull=True
+            )
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 @admin.register(VocalStyle)

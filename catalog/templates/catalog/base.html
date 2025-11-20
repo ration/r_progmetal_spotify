@@ -37,7 +37,7 @@
                 </a>
             </div>
             <div class="flex-none mr-4">
-                {% if request.user and request.user.display_name %}
+                {% if request.user.is_authenticated and request.user.display_name|default:'' %}
                 <div class="dropdown dropdown-end relative">
                     <label tabindex="0" class="btn btn-ghost btn-circle avatar">
                         <div class="w-10 rounded-full">

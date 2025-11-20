@@ -1,86 +1,107 @@
 <!-- Filter Component -->
 <div class="filters bg-base-100 p-6 rounded-lg shadow-lg mb-8">
-    <div class="flex flex-wrap gap-4 items-end">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Genre Filter -->
-        <div class="form-control flex-1 min-w-[200px]">
+        <div class="form-control">
             <label class="label">
                 <span class="label-text font-semibold">Filter by Genre</span>
             </label>
-            <select
-                name="genre"
-                class="select select-bordered w-full"
-                hx-get="{% url 'catalog:album-list' %}"
-                hx-target="#album-tiles"
-                hx-push-url="true"
-                hx-include="[name='vocal']"
-                hx-trigger="change"
-            >
-                <option value="">All Genres</option>
+            <div class="border border-base-300 rounded-lg p-4 max-h-60 overflow-y-auto space-y-2">
                 {% for genre in genres %}
-                <option value="{{ genre.slug }}" {% if genre.slug == active_genre %}selected{% endif %}>
-                    {{ genre.name }}
-                </option>
+                <label class="flex items-center gap-2 cursor-pointer hover:bg-base-200 p-2 rounded">
+                    <input
+                        type="checkbox"
+                        name="genre"
+                        value="{{ genre.slug }}"
+                        class="checkbox checkbox-primary checkbox-sm"
+                        {% if genre.slug in active_genres %}checked{% endif %}
+                        hx-get="{% url 'catalog:album-list' %}"
+                        hx-target="#album-tiles"
+                        hx-push-url="true"
+                        hx-include=".filters input[type='checkbox']:checked, .filters select[name='sort']"
+                        hx-trigger="change"
+                    />
+                    <span class="text-sm">{{ genre.name }}</span>
+                </label>
                 {% endfor %}
-            </select>
+            </div>
         </div>
 
         <!-- Vocal Style Filter -->
-        <div class="form-control flex-1 min-w-[200px]">
+        <div class="form-control">
             <label class="label">
                 <span class="label-text font-semibold">Filter by Vocal Style</span>
             </label>
+            <div class="border border-base-300 rounded-lg p-4 max-h-60 overflow-y-auto space-y-2">
+                {% for vocal in vocal_styles %}
+                <label class="flex items-center gap-2 cursor-pointer hover:bg-base-200 p-2 rounded">
+                    <input
+                        type="checkbox"
+                        name="vocal"
+                        value="{{ vocal.slug }}"
+                        class="checkbox checkbox-primary checkbox-sm"
+                        {% if vocal.slug in active_vocals %}checked{% endif %}
+                        hx-get="{% url 'catalog:album-list' %}"
+                        hx-target="#album-tiles"
+                        hx-push-url="true"
+                        hx-include=".filters input[type='checkbox']:checked, .filters select[name='sort']"
+                        hx-trigger="change"
+                    />
+                    <span class="text-sm">{{ vocal.name }}</span>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Sort Control -->
+        <div class="form-control">
+            <label class="label">
+                <span class="label-text font-semibold">Sort By</span>
+            </label>
             <select
-                name="vocal"
+                name="sort"
                 class="select select-bordered w-full"
                 hx-get="{% url 'catalog:album-list' %}"
                 hx-target="#album-tiles"
                 hx-push-url="true"
-                hx-include="[name='genre']"
+                hx-include=".filters input[type='checkbox']:checked"
                 hx-trigger="change"
             >
-                <option value="">All Vocal Styles</option>
-                {% for vocal in vocal_styles %}
-                <option value="{{ vocal.slug }}" {% if vocal.slug == active_vocal %}selected{% endif %}>
-                    {{ vocal.name }}
-                </option>
-                {% endfor %}
+                <option value="-imported_at" {% if active_sort == '-imported_at' %}selected{% endif %}>Addition Time (Newest First)</option>
+                <option value="imported_at" {% if active_sort == 'imported_at' %}selected{% endif %}>Addition Time (Oldest First)</option>
+                <option value="-release_date" {% if active_sort == '-release_date' %}selected{% endif %}>Release Date (Newest First)</option>
+                <option value="release_date" {% if active_sort == 'release_date' %}selected{% endif %}>Release Date (Oldest First)</option>
             </select>
         </div>
-
-        <!-- Clear Filters Button -->
-        {% if has_active_filters %}
-        <div class="form-control">
-            <a href="{% url 'catalog:album-list' %}" class="btn btn-outline">
-                Clear Filters
-            </a>
-        </div>
-        {% endif %}
     </div>
+
+    <!-- Clear Filters Button -->
+    {% if has_active_filters %}
+    <div class="mt-4 flex justify-end">
+        <a href="{% url 'catalog:album-list' %}" class="btn btn-outline btn-sm">
+            Clear All Filters
+        </a>
+    </div>
+    {% endif %}
 
     <!-- Active Filter Indicators -->
     {% if has_active_filters %}
     <div class="mt-4 flex gap-2 flex-wrap">
         <span class="text-sm font-semibold">Active filters:</span>
-        {% if active_genre %}
-            {% for genre in genres %}
-                {% if genre.slug == active_genre %}
-                <span class="badge badge-primary gap-2">
-                    Genre: {{ genre.name }}
-                    <a href="?{% if active_vocal %}vocal={{ active_vocal }}{% endif %}" class="hover:text-white">✕</a>
-                </span>
-                {% endif %}
-            {% endfor %}
-        {% endif %}
-        {% if active_vocal %}
-            {% for vocal in vocal_styles %}
-                {% if vocal.slug == active_vocal %}
-                <span class="badge badge-primary gap-2">
-                    Vocal: {{ vocal.name }}
-                    <a href="?{% if active_genre %}genre={{ active_genre }}{% endif %}" class="hover:text-white">✕</a>
-                </span>
-                {% endif %}
-            {% endfor %}
-        {% endif %}
+        {% for genre in genres %}
+            {% if genre.slug in active_genres %}
+            <span class="badge badge-primary gap-2">
+                Genre: {{ genre.name }}
+            </span>
+            {% endif %}
+        {% endfor %}
+        {% for vocal in vocal_styles %}
+            {% if vocal.slug in active_vocals %}
+            <span class="badge badge-primary gap-2">
+                Vocal: {{ vocal.name }}
+            </span>
+            {% endif %}
+        {% endfor %}
     </div>
     {% endif %}
 </div>
