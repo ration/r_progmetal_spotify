@@ -15,12 +15,18 @@
     <!-- Album Detail Grid -->
     <div class="album-detail-grid">
         <!-- Album Cover -->
-        <div>
-            <img
-                src="{{ album.get_cover_art_or_placeholder }}"
-                alt="{{ album.name }} by {{ album.artist.name }}"
-                class="album-detail-cover w-full rounded-lg shadow-2xl"
-            />
+        <div
+            class="album-detail-cover-container"
+            hx-get="{% url 'catalog:album-cover-art' album.id %}"
+            hx-trigger="load"
+            hx-swap="innerHTML"
+        >
+            <!-- Skeleton placeholder while loading -->
+            <div class="w-full aspect-square bg-base-300 rounded-lg shadow-2xl animate-pulse flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24 text-base-content/20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                </svg>
+            </div>
         </div>
 
         <!-- Album Information -->

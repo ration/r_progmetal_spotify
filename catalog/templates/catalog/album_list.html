@@ -22,7 +22,13 @@
     {% include "catalog/components/filters.html" %}
 
     <!-- Album Grid Container with Pagination -->
-    <div id="album-tiles">
+    <div
+        id="album-tiles"
+        hx-get="{% url 'catalog:album-list' %}"
+        hx-trigger="refreshAlbums from:body"
+        hx-include=".filters input[type='checkbox']:checked, .filters select[name='sort']"
+        hx-push-url="false"
+    >
         {% if albums %}
             <div class="album-grid">
                 {% for album in albums %}

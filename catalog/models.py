@@ -598,6 +598,29 @@ class User(models.Model):
         """Always return True for authenticated custom User objects."""
         return True
 
+    @property
+    def is_active(self) -> bool:
+        """Return True - all users are active (required by Django admin)."""
+        return True
+
+    @property
+    def is_staff(self) -> bool:
+        """Return is_admin status (required by Django admin)."""
+        return self.is_admin
+
+    @property
+    def is_superuser(self) -> bool:
+        """Return is_admin status (required by Django admin)."""
+        return self.is_admin
+
+    def has_perm(self, perm: str, obj=None) -> bool:
+        """Return True if user is admin (required by Django admin)."""
+        return self.is_admin
+
+    def has_module_perms(self, app_label: str) -> bool:
+        """Return True if user is admin (required by Django admin)."""
+        return self.is_admin
+
 
 class SpotifyToken(models.Model):
     """
@@ -662,3 +685,44 @@ class SpotifyToken(models.Model):
         self.refresh_token = new_refresh_token
         self.expires_at = timezone.now() + timedelta(seconds=expires_in)
         self.save()
+
+
+class ListenedAlbum(models.Model):
+    """
+    Tracks which albums a user has marked as listened.
+
+    Creates a many-to-many relationship between users and albums to track
+    listening history. Albums marked as listened are hidden by default
+    from the catalog view unless the user enables "show listened" filter.
+
+    Attributes:
+        user: Foreign key to User who marked the album as listened
+        album: Foreign key to Album that was listened to
+        listened_at: Timestamp when album was marked as listened
+    """
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='listened_albums'
+    )
+    album = models.ForeignKey(
+        Album,
+        on_delete=models.CASCADE,
+        related_name='listened_by_users'
+    )
+    listened_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = 'catalog_listened_album'
+        unique_together = [['user', 'album']]
+        indexes = [
+            models.Index(fields=['user', 'album'], name='idx_user_album'),
+            models.Index(fields=['-listened_at'], name='idx_listened_at_desc'),
+        ]
+        verbose_name = 'Listened Album'
+        verbose_name_plural = 'Listened Albums'
+
+    def __str__(self) -> str:
+        """Return string representation of listened album."""
+        return f"{self.user.display_name} listened to {self.album.name}"

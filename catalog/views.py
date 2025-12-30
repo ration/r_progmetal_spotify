@@ -14,7 +14,7 @@ from django.views.decorators.http import require_http_methods
 from django.views.generic import ListView, DetailView
 from spotipy.exceptions import SpotifyException
 
-from catalog.models import Album, Genre, VocalStyle, SyncOperation, SyncRecord, SpotifyToken
+from catalog.models import Album, Genre, VocalStyle, SyncOperation, SyncRecord, SpotifyToken, ListenedAlbum
 from catalog.services.sync_manager import SyncManager
 from catalog.services.album_cache import get_cached_cover_url, cache_cover_url
 from catalog.services.spotify_client import SpotifyClient
@@ -118,20 +118,46 @@ class AlbumListView(ListView):
             # Get Genre objects for the requested slugs
             requested_genres = Genre.objects.filter(slug__in=genre_slugs)
 
-            # Resolve aliases to their canonical genres
-            effective_genre_ids = []
+            # Resolve aliases to their canonical genres and collect all related genre IDs
+            genre_ids_to_filter = []
+            canonical_genre_ids = set()
+
             for genre in requested_genres:
                 effective_genre = genre.get_effective_genre()
                 if not effective_genre.is_ignored:
-                    effective_genre_ids.append(effective_genre.id)
+                    # Add the canonical genre ID
+                    canonical_genre_ids.add(effective_genre.id)
 
-            if effective_genre_ids:
-                queryset = queryset.filter(genres__id__in=effective_genre_ids).distinct()
+            # For each canonical genre, also find all aliases pointing to it
+            for canonical_id in canonical_genre_ids:
+                # Add the canonical genre itself
+                genre_ids_to_filter.append(canonical_id)
+                # Add all aliases pointing to this canonical genre
+                alias_ids = Genre.objects.filter(
+                    canonical_genre_id=canonical_id,
+                    is_ignored=False
+                ).values_list('id', flat=True)
+                genre_ids_to_filter.extend(alias_ids)
+
+            if genre_ids_to_filter:
+                queryset = queryset.filter(genres__id__in=genre_ids_to_filter).distinct()
 
         # Filter by vocal styles if provided (matches albums with any of the selected styles)
         vocal_slugs = self.request.GET.getlist("vocal")
         if vocal_slugs:
             queryset = queryset.filter(vocal_style__slug__in=vocal_slugs)
+
+        # Filter by listened status (hide listened albums by default)
+        show_listened = self.request.GET.get("show_listened", "").lower() == "true"
+
+        # Only filter if user is authenticated
+        if hasattr(self.request, 'user') and self.request.user is not None:
+            if not show_listened:
+                # Hide listened albums - exclude albums that user has listened to
+                listened_album_ids = ListenedAlbum.objects.filter(
+                    user=self.request.user
+                ).values_list('album_id', flat=True)
+                queryset = queryset.exclude(id__in=listened_album_ids)
 
         # Apply sorting
         sort_field = self.request.GET.get("sort", "-imported_at")
@@ -185,9 +211,20 @@ class AlbumListView(ListView):
         context["active_genres"] = self.request.GET.getlist("genre")
         context["active_vocals"] = self.request.GET.getlist("vocal")
         context["active_sort"] = self.request.GET.get("sort", "-imported_at")
+        context["show_listened"] = self.request.GET.get("show_listened", "").lower() == "true"
         context["has_active_filters"] = bool(
             context["active_genres"] or context["active_vocals"]
         )
+
+        # Add listened album IDs for the current user (to show button state)
+        if hasattr(self.request, 'user') and self.request.user is not None:
+            context["listened_album_ids"] = set(
+                ListenedAlbum.objects.filter(
+                    user=self.request.user
+                ).values_list('album_id', flat=True)
+            )
+        else:
+            context["listened_album_ids"] = set()
 
         # Add synchronization statistics
         context["latest_sync"] = SyncRecord.objects.filter(success=True).first()
@@ -232,6 +269,23 @@ class AlbumDetailView(DetailView):
         album = self.get_object()
         context["page_title"] = f"{album.name} by {album.artist.name}"
         return context
+
+
+def admin_album_page(request: HttpRequest) -> HttpResponse:
+    """
+    Redirect to Django admin page for Genre management.
+
+    This provides access to the genre alias management interface where
+    administrators can mark genres as ignored or set canonical genres
+    for deduplication.
+
+    Args:
+        request: HTTP request object
+
+    Returns:
+        HttpResponse: Redirect to Django admin Genre changelist
+    """
+    return redirect('/admin/catalog/genre/')
 
 
 def admin_sync_page(request: HttpRequest) -> HttpResponse:
@@ -988,3 +1042,100 @@ def disconnect_spotify(request: HttpRequest) -> HttpResponse:
 
     request.session.flush()
     return redirect('/catalog/auth/login/?disconnected=true')
+
+
+@csrf_protect
+@require_http_methods(["POST"])
+def toggle_listened(request: HttpRequest, album_id: int) -> HttpResponse:
+    """
+    Toggle listened status for an album.
+
+    Creates or deletes a ListenedAlbum record for the current user and album.
+    Returns an HTML fragment with the updated button state for HTMX swap.
+
+    Args:
+        request: HTTP POST request (requires CSRF token)
+        album_id: Album primary key
+
+    Returns:
+        HttpResponse: HTML fragment with updated button state
+        - 200: Success with button HTML
+        - 401: User not authenticated
+        - 404: Album not found
+    """
+    # Check authentication
+    if not hasattr(request, 'user') or request.user is None:
+        return HttpResponse(
+            '<div class="text-error text-xs">Login required</div>',
+            status=401
+        )
+
+    # Get album or return 404
+    try:
+        album = Album.objects.get(id=album_id)
+    except Album.DoesNotExist:
+        return HttpResponse(
+            '<div class="text-error text-xs">Album not found</div>',
+            status=404
+        )
+
+    # Toggle listened status
+    listened_record = ListenedAlbum.objects.filter(
+        user=request.user,
+        album=album
+    ).first()
+
+    if listened_record:
+        # Already listened - remove it (unlisten)
+        listened_record.delete()
+        is_listened = False
+        logger.info(f"User {request.user.display_name} unlistened to album {album_id}")  # type: ignore[attr-defined]
+    else:
+        # Not listened - add it
+        ListenedAlbum.objects.create(user=request.user, album=album)
+        is_listened = True
+        logger.info(f"User {request.user.display_name} listened to album {album_id}")  # type: ignore[attr-defined]
+
+    # Check if user has show_listened enabled
+    show_listened = request.GET.get("show_listened", "").lower() == "true"
+
+    # If show_listened is disabled (default) and album was just marked as listened,
+    # trigger refresh to hide the album immediately
+    if not show_listened and is_listened:
+        # Album was just marked as listened and show_listened is off - trigger refresh to hide it
+        response = HttpResponse("", status=200)
+        response["HX-Trigger"] = "refreshAlbums"
+        return response
+
+    # In all other cases, just update the button
+    # (show_listened is on, or album was unmarked as listened)
+    if is_listened:
+        html = f"""
+        <button
+            class="btn btn-success btn-xs"
+            hx-post="/catalog/albums/{album_id}/toggle-listened/"
+            hx-target="closest button"
+            hx-swap="outerHTML"
+            title="Mark as unlistened">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+            </svg>
+            Listened
+        </button>
+        """
+    else:
+        html = f"""
+        <button
+            class="btn btn-ghost btn-xs"
+            hx-post="/catalog/albums/{album_id}/toggle-listened/"
+            hx-target="closest button"
+            hx-swap="outerHTML"
+            title="Mark as listened">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            Mark Listened
+        </button>
+        """
+
+    return HttpResponse(html, content_type="text/html")

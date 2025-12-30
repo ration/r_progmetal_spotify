@@ -72,6 +72,25 @@
                 <option value="-release_date" {% if active_sort == '-release_date' %}selected{% endif %}>Release Date (Newest First)</option>
                 <option value="release_date" {% if active_sort == 'release_date' %}selected{% endif %}>Release Date (Oldest First)</option>
             </select>
+
+            <!-- Show Listened Toggle (only show if user is authenticated) -->
+            {% if user %}
+            <label class="label cursor-pointer mt-4 border border-base-300 rounded-lg p-3 hover:bg-base-200">
+                <span class="label-text font-semibold">Show Listened Albums</span>
+                <input
+                    type="checkbox"
+                    name="show_listened"
+                    value="true"
+                    class="toggle toggle-primary"
+                    {% if show_listened %}checked{% endif %}
+                    hx-get="{% url 'catalog:album-list' %}"
+                    hx-target="#album-tiles"
+                    hx-push-url="true"
+                    hx-include=".filters input[type='checkbox']:checked, .filters select[name='sort']"
+                    hx-trigger="change"
+                />
+            </label>
+            {% endif %}
         </div>
     </div>
 

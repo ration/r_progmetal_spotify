@@ -255,6 +255,27 @@ body {
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
 }
 
+/* Album detail cover container (HTMX JIT loading) */
+.album-detail-cover-container {
+    width: 100%;
+    position: relative;
+}
+
+/* Album detail cover art loaded via HTMX */
+.album-detail-cover-container img {
+    width: 100% !important;
+    height: auto !important;
+    border-radius: 0.5rem !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2) !important;
+    display: block !important;
+}
+
+/* Skeleton placeholder for detail page */
+.album-detail-cover-container > div {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+}
+
 .album-detail-info {
     display: flex;
     flex-direction: column;
