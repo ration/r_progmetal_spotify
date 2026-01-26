@@ -31,15 +31,7 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-Verify compliance with `.specify/memory/constitution.md` principles:
-
-- [ ] **Specification-Driven**: Feature spec completed and validated before planning
-- [ ] **Type Safety & Code Quality**: Implementation will include type annotations (pyright), linting (ruff), and docstrings
-- [ ] **User-Centric Design**: Implementation organized by prioritized user stories (P1, P2, P3...)
-- [ ] **Test Independence**: Test requirements explicitly defined in spec (or N/A if no tests requested)
-- [ ] **Incremental Delivery**: Tasks structured to deliver each user story independently
-
-**Violations**: [Document any principle violations with justification, or state "None"]
+[Gates determined based on constitution file]
 
 ## Project Structure
 

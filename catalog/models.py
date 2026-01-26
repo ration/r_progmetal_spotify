@@ -726,3 +726,45 @@ class ListenedAlbum(models.Model):
     def __str__(self) -> str:
         """Return string representation of listened album."""
         return f"{self.user.display_name} listened to {self.album.name}"
+
+
+class IgnoredAlbum(models.Model):
+    """
+    Tracks which albums a user has marked as ignored.
+
+    Creates a many-to-many relationship between users and albums to track
+    albums the user wants to hide from their view. Albums marked as ignored
+    are hidden by default from the catalog view unless the user enables
+    "show ignored" filter.
+
+    Attributes:
+        user: Foreign key to User who marked the album as ignored
+        album: Foreign key to Album that was ignored
+        ignored_at: Timestamp when album was marked as ignored
+    """
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='ignored_albums'
+    )
+    album = models.ForeignKey(
+        Album,
+        on_delete=models.CASCADE,
+        related_name='ignored_by_users'
+    )
+    ignored_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = 'catalog_ignored_album'
+        unique_together = [['user', 'album']]
+        indexes = [
+            models.Index(fields=['user', 'album'], name='idx_user_album_ignored'),
+            models.Index(fields=['-ignored_at'], name='idx_ignored_at_desc'),
+        ]
+        verbose_name = 'Ignored Album'
+        verbose_name_plural = 'Ignored Albums'
+
+    def __str__(self) -> str:
+        """Return string representation of ignored album."""
+        return f"{self.user.display_name} ignored {self.album.name}"

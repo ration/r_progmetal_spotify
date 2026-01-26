@@ -10,6 +10,7 @@ urlpatterns = [
     path("<int:pk>/", views.AlbumDetailView.as_view(), name="album-detail"),
     path("album/<int:album_id>/cover-art/", views.album_cover_art, name="album-cover-art"),
     path("albums/<int:album_id>/toggle-listened/", views.toggle_listened, name="toggle-listened"),
+    path("albums/<int:album_id>/toggle-ignored/", views.toggle_ignored, name="toggle-ignored"),
     path("admin/album/", views.admin_album_page, name="album-admin"),
     path("admin/sync/", views.admin_sync_page, name="admin-sync"),
     path("sync/trigger/", views.sync_trigger, name="sync-trigger"),

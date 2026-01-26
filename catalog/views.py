@@ -14,7 +14,7 @@ from django.views.decorators.http import require_http_methods
 from django.views.generic import ListView, DetailView
 from spotipy.exceptions import SpotifyException
 
-from catalog.models import Album, Genre, VocalStyle, SyncOperation, SyncRecord, SpotifyToken, ListenedAlbum
+from catalog.models import Album, Genre, VocalStyle, SyncOperation, SyncRecord, SpotifyToken, ListenedAlbum, IgnoredAlbum
 from catalog.services.sync_manager import SyncManager
 from catalog.services.album_cache import get_cached_cover_url, cache_cover_url
 from catalog.services.spotify_client import SpotifyClient
@@ -149,6 +149,8 @@ class AlbumListView(ListView):
 
         # Filter by listened status (hide listened albums by default)
         show_listened = self.request.GET.get("show_listened", "").lower() == "true"
+        # Filter by ignored status (hide ignored albums by default)
+        show_ignored = self.request.GET.get("show_ignored", "").lower() == "true"
 
         # Only filter if user is authenticated
         if hasattr(self.request, 'user') and self.request.user is not None:
@@ -158,6 +160,13 @@ class AlbumListView(ListView):
                     user=self.request.user
                 ).values_list('album_id', flat=True)
                 queryset = queryset.exclude(id__in=listened_album_ids)
+
+            if not show_ignored:
+                # Hide ignored albums - exclude albums that user has ignored
+                ignored_album_ids = IgnoredAlbum.objects.filter(
+                    user=self.request.user
+                ).values_list('album_id', flat=True)
+                queryset = queryset.exclude(id__in=ignored_album_ids)
 
         # Apply sorting
         sort_field = self.request.GET.get("sort", "-imported_at")
@@ -212,6 +221,7 @@ class AlbumListView(ListView):
         context["active_vocals"] = self.request.GET.getlist("vocal")
         context["active_sort"] = self.request.GET.get("sort", "-imported_at")
         context["show_listened"] = self.request.GET.get("show_listened", "").lower() == "true"
+        context["show_ignored"] = self.request.GET.get("show_ignored", "").lower() == "true"
         context["has_active_filters"] = bool(
             context["active_genres"] or context["active_vocals"]
         )
@@ -223,8 +233,14 @@ class AlbumListView(ListView):
                     user=self.request.user
                 ).values_list('album_id', flat=True)
             )
+            context["ignored_album_ids"] = set(
+                IgnoredAlbum.objects.filter(
+                    user=self.request.user
+                ).values_list('album_id', flat=True)
+            )
         else:
             context["listened_album_ids"] = set()
+            context["ignored_album_ids"] = set()
 
         # Add synchronization statistics
         context["latest_sync"] = SyncRecord.objects.filter(success=True).first()
@@ -1135,6 +1151,104 @@ def toggle_listened(request: HttpRequest, album_id: int) -> HttpResponse:
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
             </svg>
             Mark Listened
+        </button>
+        """
+
+    return HttpResponse(html, content_type="text/html")
+
+
+@csrf_protect
+@require_http_methods(["POST"])
+def toggle_ignored(request: HttpRequest, album_id: int) -> HttpResponse:
+    """
+    Toggle ignored status for an album.
+
+    Creates or deletes an IgnoredAlbum record for the current user and album.
+    Returns an HTML fragment with the updated button state for HTMX swap.
+
+    Args:
+        request: HTTP POST request (requires CSRF token)
+        album_id: Album primary key
+
+    Returns:
+        HttpResponse: HTML fragment with updated button state
+        - 200: Success with button HTML
+        - 401: User not authenticated
+        - 404: Album not found
+    """
+    # Check authentication
+    if not hasattr(request, 'user') or request.user is None:
+        return HttpResponse(
+            '<div class="text-error text-xs">Login required</div>',
+            status=401
+        )
+
+    # Get album or return 404
+    try:
+        album = Album.objects.get(id=album_id)
+    except Album.DoesNotExist:
+        return HttpResponse(
+            '<div class="text-error text-xs">Album not found</div>',
+            status=404
+        )
+
+    # Toggle ignored status
+    ignored_record = IgnoredAlbum.objects.filter(
+        user=request.user,
+        album=album
+    ).first()
+
+    if ignored_record:
+        # Already ignored - remove it (unignore)
+        ignored_record.delete()
+        is_ignored = False
+        logger.info(f"User {request.user.display_name} unignored album {album_id}")  # type: ignore[attr-defined]
+    else:
+        # Not ignored - add it
+        IgnoredAlbum.objects.create(user=request.user, album=album)
+        is_ignored = True
+        logger.info(f"User {request.user.display_name} ignored album {album_id}")  # type: ignore[attr-defined]
+
+    # Check if user has show_ignored enabled
+    show_ignored = request.GET.get("show_ignored", "").lower() == "true"
+
+    # If show_ignored is disabled (default) and album was just marked as ignored,
+    # trigger refresh to hide the album immediately
+    if not show_ignored and is_ignored:
+        # Album was just marked as ignored and show_ignored is off - trigger refresh to hide it
+        response = HttpResponse("", status=200)
+        response["HX-Trigger"] = "refreshAlbums"
+        return response
+
+    # In all other cases, just update the button
+    # (show_ignored is on, or album was unmarked as ignored)
+    if is_ignored:
+        html = f"""
+        <button
+            class="btn btn-warning btn-xs"
+            hx-post="/catalog/albums/{album_id}/toggle-ignored/"
+            hx-target="closest button"
+            hx-swap="outerHTML"
+            title="Unignore">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clip-rule="evenodd" />
+                <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
+            </svg>
+            Ignored
+        </button>
+        """
+    else:
+        html = f"""
+        <button
+            class="btn btn-ghost btn-xs"
+            hx-post="/catalog/albums/{album_id}/toggle-ignored/"
+            hx-target="closest button"
+            hx-swap="outerHTML"
+            title="Ignore">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+            </svg>
+            Ignore
         </button>
         """
 

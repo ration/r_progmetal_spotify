@@ -90,6 +90,23 @@
                     hx-trigger="change"
                 />
             </label>
+
+            <!-- Show Ignored Toggle (only show if user is authenticated) -->
+            <label class="label cursor-pointer mt-4 border border-base-300 rounded-lg p-3 hover:bg-base-200">
+                <span class="label-text font-semibold">Show Ignored Albums</span>
+                <input
+                    type="checkbox"
+                    name="show_ignored"
+                    value="true"
+                    class="toggle toggle-primary"
+                    {% if show_ignored %}checked{% endif %}
+                    hx-get="{% url 'catalog:album-list' %}"
+                    hx-target="#album-tiles"
+                    hx-push-url="true"
+                    hx-include=".filters input[type='checkbox']:checked, .filters select[name='sort']"
+                    hx-trigger="change"
+                />
+            </label>
             {% endif %}
         </div>
     </div>

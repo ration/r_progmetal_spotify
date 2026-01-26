@@ -1,7 +1,7 @@
 """Django admin configuration for the Album Catalog application."""
 
 from django.contrib import admin
-from catalog.models import Album, Artist, Genre, VocalStyle, SyncRecord, ListenedAlbum
+from catalog.models import Album, Artist, Genre, VocalStyle, SyncRecord, ListenedAlbum, IgnoredAlbum
 
 
 @admin.register(Album)
@@ -131,6 +131,25 @@ class ListenedAlbumAdmin(admin.ModelAdmin):
     search_fields = ["user__display_name", "album__name", "album__artist__name"]
     readonly_fields = ["listened_at"]
     ordering = ["-listened_at"]
+
+    def has_add_permission(self, request):
+        """Allow manual creation for testing/admin purposes."""
+        return True
+
+
+@admin.register(IgnoredAlbum)
+class IgnoredAlbumAdmin(admin.ModelAdmin):
+    """Admin interface for viewing ignored album history."""
+
+    list_display = [
+        "user",
+        "album",
+        "ignored_at",
+    ]
+    list_filter = ["ignored_at", "user"]
+    search_fields = ["user__display_name", "album__name", "album__artist__name"]
+    readonly_fields = ["ignored_at"]
+    ordering = ["-ignored_at"]
 
     def has_add_permission(self, request):
         """Allow manual creation for testing/admin purposes."""
